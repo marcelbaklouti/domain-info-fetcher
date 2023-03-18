@@ -1,4 +1,4 @@
-[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/marcelbaklouti/domain-info-fetcher)](https://github.com/marcelbaklouti/domain-info-fetcher/releases/latest)
+[![Release](https://github.com/marcelbaklouti/domain-info-fetcher/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/marcelbaklouti/domain-info-fetcher/actions/workflows/release.yml)
 
 # domain-info-fetcher
 

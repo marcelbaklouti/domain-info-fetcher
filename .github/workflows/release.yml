@@ -10,34 +10,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: 18
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 18
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Run build
-      run: npm run build
+      - name: Run build
+        run: npm run build
 
-    - name: Test
-      run: npm test
+      - name: Test
+        run: npm test
 
-    - name: Release and publish to npm
-      if: success()
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        USER: ${{ secrets.USER }}
-        EMAIL: ${{ secrets.EMAIL }}
-      run: |
-        git config --global user.name "$USER"
-        git config --global user.email "$EMAIL"
-        npm version patch -m "chore(release): %s [skip ci]"
-        git push --follow-tags
-        echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
-        npm publish
+      - name: Release and publish to npm
+        uses: actions/checkout@v3
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm version patch -m "chore(release): %s [skip ci]"
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Creating release for version $VERSION"
+          body=$(echo "{}" | jq --arg version "$VERSION" '.body = "Release version \($version)"')
+          response=$(curl --silent --request POST --url "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" \
+            --header "authorization: Bearer $GITHUB_TOKEN" \
+            --header "content-type: application/json" \
+            --data "$body")
+          release_id=$(echo "$response" | jq -r '.id')
+          echo "Release created with ID $release_id"
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
+          npm publish
