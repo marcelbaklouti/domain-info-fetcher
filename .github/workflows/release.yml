@@ -32,9 +32,11 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        USER: ${{ secrets.USER }}
+        EMAIL: ${{ secrets.EMAIL }}
       run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@users.noreply.github.com"
+        git config --global user.name "$USER"
+        git config --global user.email "$EMAIL"
         npm version patch -m "chore(release): %s [skip ci]"
         git push --follow-tags
         echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
