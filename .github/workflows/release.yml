@@ -34,7 +34,6 @@ jobs:
         run: |
           git config --global user.email "action@github.com"
           git config --global user.name "github-actions"
-          npm version ${{ github.event_name == 'pull_request' ? 'prerelease' : 'minor' }} --no-git-tag-version -m "chore(release): %s [skip ci]"
           VERSION=$(node -p "require('./package.json').version")
           echo "Creating release for version $VERSION"
           body=$(echo "{}" | jq --arg version "$VERSION" '.body = "Release version \($version)"')
