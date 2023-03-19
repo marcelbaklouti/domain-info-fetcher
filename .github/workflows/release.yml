@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 18
 
@@ -30,7 +30,6 @@ jobs:
       - name: Release and publish to npm
         if: success()
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm version patch -m "chore(release): %s [skip ci]"
@@ -44,4 +43,4 @@ jobs:
           release_id=$(echo "$response" | jq -r '.id')
           echo "Release created with ID $release_id"
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
-          npm publish
+          npm publish --access public
