@@ -17,6 +17,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18
+          registry-url: https://npm.pkg.github.com
 
       - name: Install dependencies
         run: npm ci
@@ -27,53 +28,33 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Create GitHub Release
+        if: success()
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          release_name: Release v${{ steps.get_version.outputs.version }}
+          body: "Release version v${{ steps.get_version.outputs.version }}"
+          draft: false
+          prerelease: false
+
       - name: Publish to npm
         if: success()
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          git config --global user.email "action@github.com"
-          git config --global user.name "github-actions"
-          VERSION=$(node -p "require('./package.json').version")
-          echo "Creating release for version $VERSION"
-          body=$(echo "{}" | jq --arg version "$VERSION" '.body = "Release version \($version)"')
-          response=$(curl --silent --request POST --url "https://api.github.com/repos/$GITHUB_REPOSITORY/releases" \
-            --header "authorization: Bearer $GITHUB_TOKEN" \
-            --header "content-type: application/json" \
-            --data "$body")
-          release_id=$(echo "$response" | jq -r '.id')
-          echo "Release created with ID $release_id"
-          echo "//npm.pkg.github.com/:_authToken=$NPM_TOKEN" > .npmrc
-          echo "@${{ github.repository_owner }}:registry=https://npm.pkg.github.com" >> .npmrc
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
           npm publish --access public
+          echo "Release published to npm"
 
-      - name: Create release tag
+      - name: Publish to GitHub Package Registry
         if: success()
         run: |
-          git tag -a v${{ steps.version.outputs.version }} -m "Release version ${{ steps.version.outputs.version }}"
-          git push --follow-tags
+          echo "//npm.pkg.github.com/:_authToken=$GPR_TOKEN" > .npmrc
+          npm publish
+          echo "Release published to GitHub Package Registry"
 
-      - name: Create release
-        if: success()
-        uses: actions/create-release@v1
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          release_name: Release version ${{ steps.version.outputs.version }}
-          body: |
-            Changes in this Release
-            - First change
-            - Second change
-          draft: false
-          prerelease: ${{ github.event_name == 'pull_request' }}
-
-      - name: Upload release asset
-        if: success()
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/index.js
-          asset_name: index.js
-          asset_content_type: application/javascript
-
+      - name: Get package version
+        id: get_version
+        run: echo "::set-output name=version::$(node -p "require('./package.json').version")"
