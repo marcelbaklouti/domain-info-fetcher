@@ -27,14 +27,14 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Release and publish to npm
+      - name: Publish to npm
         if: success()
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           git config --global user.email "action@github.com"
           git config --global user.name "github-actions"
-          npm version patch -m "chore(release): %s [skip ci]"
+          npm version ${{ github.event_name == 'pull_request' ? 'prerelease' : 'minor' }} --no-git-tag-version -m "chore(release): %s [skip ci]"
           VERSION=$(node -p "require('./package.json').version")
           echo "Creating release for version $VERSION"
           body=$(echo "{}" | jq --arg version "$VERSION" '.body = "Release version \($version)"')
@@ -44,18 +44,37 @@ jobs:
             --data "$body")
           release_id=$(echo "$response" | jq -r '.id')
           echo "Release created with ID $release_id"
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
+          echo "//npm.pkg.github.com/:_authToken=$NPM_TOKEN" > .npmrc
+          echo "@${{ github.repository_owner }}:registry=https://npm.pkg.github.com" >> .npmrc
           npm publish --access public
 
-      - name: Create tag
+      - name: Create release tag
         if: success()
         run: |
-          git config --global user.email "action@github.com"
-          git config --global user.name "github-actions"
-          VERSION=$(node -p "require('./package.json').version")
-          echo "Creating tag for version $VERSION"
-          git tag -a v${VERSION} -m "Release version ${VERSION}"
-          git push origin v${VERSION}
-          TAG=$(git tag -l --points-at HEAD)
-          echo "Tag $TAG created"
+          git tag -a v${{ steps.version.outputs.version }} -m "Release version ${{ steps.version.outputs.version }}"
+          git push --follow-tags
+
+      - name: Create release
+        if: success()
+        uses: actions/create-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Release version ${{ steps.version.outputs.version }}
+          body: |
+            Changes in this Release
+            - First change
+            - Second change
+          draft: false
+          prerelease: ${{ github.event_name == 'pull_request' }}
+
+      - name: Upload release asset
+        if: success()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/index.js
+          asset_name: index.js
+          asset_content_type: application/javascript
 
