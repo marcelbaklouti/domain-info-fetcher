@@ -32,6 +32,8 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "github-actions"
           npm version patch -m "chore(release): %s [skip ci]"
           VERSION=$(node -p "require('./package.json').version")
           echo "Creating release for version $VERSION"
