@@ -12,6 +12,9 @@ jobs:
       matrix:
         test-attempt: [1, 2]
       max-parallel: 1
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -36,6 +39,10 @@ jobs:
       - name: Check if test failed
         if: steps.test.outputs.failed == 'true' && matrix.test-attempt == 2
         run: exit 1
+
+      - name: Get package version
+        id: get_version
+        run: echo "::set-output name=version::$(node -p "require('./package.json').version")"
         
       - name: Create GitHub Release
         if: success()
@@ -50,24 +57,13 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Publish to npm
+      - name: Publish to npm and GitHub Package Registry
         if: success()
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
-          npm publish --access public
-          echo "Release published to npm"
-
-      - name: Publish to GitHub Package Registry
-        if: success()
-        env:
           GPR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "//npm.pkg.github.com/:_authToken=$GPR_TOKEN" > .npmrc
-          npm publish
-          echo "Release published to GitHub Package Registry"
-
-      - name: Get package version
-        id: get_version
-        run: echo "::set-output name=version::$(node -p "require('./package.json').version")"
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
+          echo "//npm.pkg.github.com/:_authToken=$GPR_TOKEN" >> .npmrc
+          npm publish --access public
+          echo "Release published to npm and GitHub Package Registry"
