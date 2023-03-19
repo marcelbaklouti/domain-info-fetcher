@@ -1,6 +1,6 @@
 {
   "name": "domain-info-fetcher",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A package to fetch information about a domain including SSL certificate, server, and DNS records",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
