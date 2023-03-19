@@ -41,6 +41,8 @@ jobs:
         if: success()
         id: create_release
         uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ steps.get_version.outputs.version }}
           release_name: Release v${{ steps.get_version.outputs.version }}
@@ -59,6 +61,8 @@ jobs:
 
       - name: Publish to GitHub Package Registry
         if: success()
+        env:
+          GPR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "//npm.pkg.github.com/:_authToken=$GPR_TOKEN" > .npmrc
           npm publish
