@@ -48,15 +48,6 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Publish to GitHub registry
-        if: success()
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-        run: |
-          echo "//npm.pkg.github.com/:_authToken=$NODE_AUTH_TOKEN" > .npmrc
-          npm publish --access public
-          echo "Release published to GitHub package registry"
-
       - name: Publish to npm registry
         if: success()
         env:
