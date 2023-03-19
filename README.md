@@ -1,4 +1,6 @@
-[![Release](https://github.com/marcelbaklouti/domain-info-fetcher/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/marcelbaklouti/domain-info-fetcher/actions/workflows/release.yml)
+[![GitHub release](https://img.shields.io/github/release/marcelbaklouti/domain-info-fetcher.svg)](https://github.com/marcelbaklouti/domain-info-fetcher/releases/latest)
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/marcelbaklouti/domain-info-fetcher/Release)](https://github.com/marcelbaklouti/domain-info-fetcher/actions/workflows/release.yml)
+[![npm](https://img.shields.io/npm/v/domain-info-fetcher.svg)](https://www.npmjs.com/package/domain-info-fetcher)
 
 # domain-info-fetcher
 

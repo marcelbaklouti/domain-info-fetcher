@@ -46,3 +46,16 @@ jobs:
           echo "Release created with ID $release_id"
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
           npm publish --access public
+
+      - name: Create tag
+        if: success()
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "github-actions"
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Creating tag for version $VERSION"
+          git tag -a v${VERSION} -m "Release version ${VERSION}"
+          git push origin v${VERSION}
+          TAG=$(git tag -l --points-at HEAD)
+          echo "Tag $TAG created"
+
