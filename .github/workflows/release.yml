@@ -8,10 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        test-attempt: [1, 2]
-      max-parallel: 1
     permissions:
       contents: read
       packages: write
@@ -33,12 +29,7 @@ jobs:
         run: npm run build
 
       - name: Test
-        run: npm test || (echo '::set-output name=failed::true' && exit 1)
-        continue-on-error: true
-
-      - name: Check if test failed
-        if: steps.test.outputs.failed == 'true' && matrix.test-attempt == 2
-        run: exit 1
+        run: npm test
 
       - name: Get package version
         id: get_version
@@ -57,13 +48,21 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Publish to npm and GitHub Package Registry
+      - name: Publish to GitHub registry
+        if: success()
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=$NODE_AUTH_TOKEN" > .npmrc
+          npm publish --access public
+          echo "Release published to GitHub package registry"
+
+      - name: Publish to npm registry
         if: success()
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         run: |
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
-          echo "//npm.pkg.github.com/:_authToken=$NODE_AUTH_TOKEN" >> .npmrc
           npm publish --access public
-          echo "Release published to npm and GitHub Package Registry"
+          echo "Release published to npm package registry"
+
