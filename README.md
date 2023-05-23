@@ -17,14 +17,18 @@ npm install domain-info-fetcher
 ### TypeScript
 
 ```typescript
-import { fetchDomainInfo, IDomainInfo } from 'domain-info-fetcher';
+import { fetchDomainInfo } from 'domain-info-fetcher';
 
 async function main() {
-  const domainInfo: IDomainInfo | undefined = await fetchDomainInfo('example.com');
+  const domainInfo = await fetchDomainInfo('example.com');
+
   if (domainInfo) {
     console.log('SSL Data:', domainInfo.sslData);
     console.log('Server Data:', domainInfo.serverData);
     console.log('DNS Data:', domainInfo.dnsData);
+    console.log('HTTP Status:', domainInfo.httpStatus);
+  } else {
+    console.error('Error fetching domain information');
   }
 }
 
@@ -38,10 +42,14 @@ const { fetchDomainInfo } = require('domain-info-fetcher');
 
 async function main() {
   const domainInfo = await fetchDomainInfo('example.com');
+  
   if (domainInfo) {
     console.log('SSL Data:', domainInfo.sslData);
     console.log('Server Data:', domainInfo.serverData);
     console.log('DNS Data:', domainInfo.dnsData);
+    console.log('HTTP Status:', domainInfo.httpStatus);
+  } else {
+    console.error('Error fetching domain information');
   }
 }
 
@@ -50,7 +58,7 @@ main();
 
 ## API
 
-### `fetchDomainInfo(domain: string): Promise<IDomainInfo | undefined>`
+### `fetchDomainInfo(domain: string): Promise<DomainInfo | undefined>`
 
 Fetches the SSL, server and DNS information of the given domain.
 
@@ -65,15 +73,16 @@ Returns a promise that resolves to an object with the following properties:
 | `sslData` | The SSL certificate data of the domain. |
 | `serverData` | The server software used by the domain. (if available) |
 | `dnsData` | The DNS records of the domain. |
+| `httpStatus` | The HTTP status code of the domain. |
 
 Returns `undefined` if an error occurs while fetching the domain information.
 
-### `IDomainInfo`
+### `DomainInfo`
 
 The interface for the object returned by `fetchDomainInfo`.
 
 ```typescript
-interface IDomainInfo {
+interface DomainInfo {
   sslData: any;
   serverData: string | undefined;
   dnsData: {
@@ -84,6 +93,7 @@ interface IDomainInfo {
     NS: string[];
     SOA: dns.SoaRecord | null;
   };
+  httpStatus: number;
 }
 ```
 
