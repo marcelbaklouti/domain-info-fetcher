@@ -8,7 +8,7 @@ interface CustomSocket extends Socket {
 }
 
 // DomainInfo interface to describe the return type of fetchDomainInfo function
-interface IDomainInfo {
+interface DomainInfo {
   sslData: any;
   serverData: string | undefined;
   dnsData: {
@@ -19,6 +19,7 @@ interface IDomainInfo {
     NS: string[];
     SOA: dns.SoaRecord | null;
   };
+  httpStatus: number;
 }
 
 /**
@@ -26,24 +27,19 @@ interface IDomainInfo {
  * @param domain The domain to fetch the information for.
  * @returns A Promise that resolves to an object containing the SSL, server, and DNS data.
  */
-export async function fetchDomainInfo(domain: string): Promise<IDomainInfo | undefined> {
+export async function fetchDomainInfo(domain: string): Promise<DomainInfo | undefined> {
   try {
-    const sslData = await getSslData(domain);
-    const serverData = await getServerData(domain);
-    const dnsData = await getDnsData(domain);
+    const formattedDomain = formatDomain(domain);
+    const [sslData, serverData, dnsData, httpStatus] = await Promise.all([
+      getSslData(formattedDomain),
+      getServerData(formattedDomain),
+      getDnsData(formattedDomain),
+      getHttpStatus(formattedDomain),
+    ]);
 
-    // console.log('SSL Data:', sslData);
-    // console.log('Server Data:', serverData);
-    // console.log('DNS Data:', dnsData);
-
-    return {
-      sslData,
-      serverData,
-      dnsData,
-    };
-
+    return { sslData, serverData, dnsData, httpStatus };
   } catch (error) {
-    console.error('Error fetching domain information:', error);
+    console.error(error);
     return undefined;
   }
 }
@@ -227,4 +223,30 @@ function getSoaRecord(domain: string): Promise<dns.SoaRecord | null> {
   });
 }
 
+/**
+ * Retrieves HTTP status for the given domain.
+ * @param domain The domain to fetch the HTTP status for.
+ * @returns A Promise that resolves to a number containing the HTTP status.
+ */
+async function getHttpStatus(domain: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(`https://${domain}`, { method: 'HEAD' }, (res) => {
+      resolve(res.statusCode || 0);
+    });
 
+    req.on('error', (error) => {
+      reject(error);
+    });
+
+    req.end();
+  });
+}
+
+/**
+ * Formats a given domain to `example.com` format.
+ * @param domain The domain to format.
+ * @returns The formatted domain.
+ */
+function formatDomain(domain: string): string {
+  return domain.replace(/^(https?:\/\/)?(www\.)?/i, '').replace(/\/$/, '').toLowerCase();
+}
