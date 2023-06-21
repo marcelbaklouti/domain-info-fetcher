@@ -5,7 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.1] - 2023-06-21
+
+### Fixed
+
+- Bug that caused circular json objects to not return the correct data
+
+### Updated
+
+- Updated the README.md
+- Updated dependencies to the latest version
+- Tests
+
+### Added
+
+- New functions to format and validate data returned by the `fetchDomainInfo` function
+- New tests for the new functions
 
 ## [1.1.0] - 2023-05-23
 
