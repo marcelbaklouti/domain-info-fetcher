@@ -6,3 +6,5 @@ coverage/
 *.log
 *.pid
 *.lock
+.DS_Store
+.vscode/

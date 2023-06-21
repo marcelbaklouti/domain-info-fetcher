@@ -9,7 +9,13 @@ interface CustomSocket extends Socket {
 
 // DomainInfo interface to describe the return type of fetchDomainInfo function
 interface DomainInfo {
-  sslData: any;
+  sslData: {
+    subject: { [key: string]: string | string[] };
+    issuer: { [key: string]: string | string[] };
+    valid: boolean;
+    validFrom: number;
+    validTo: number;
+  }
   serverData: string | undefined;
   dnsData: {
     A: string[];
@@ -18,8 +24,55 @@ interface DomainInfo {
     MX: Array<{ exchange: string; priority: number }>;
     NS: string[];
     SOA: dns.SoaRecord | null;
+  } | undefined;
+  httpStatus: number | undefined;
+}
+
+/**
+ * Formats a given domain to `example.com` format.
+ * @param domain The domain to format.
+ * @returns The formatted domain.
+ */
+export function formatDomain(domain: string): string {
+  return domain.replace(/^(https?:\/\/)?(www\.)?/i, '').replace(/\/$/, '').toLowerCase();
+}
+
+
+/**
+ * Checks if the given domain is valid.
+ * @param domain The domain to check.
+ * @returns True if the domain is valid, false otherwise.
+ */
+export const checkDomain = (domain: string): boolean => {
+  const domainParts = domain.split('.');
+  return domainParts.length > 1 && domainParts[0].length > 0;
+};
+
+/**
+ * converts a date string to a timestamp
+ * @param dateString
+ * @returns timestamp
+ */
+export function dateToTimestamp(dateString: string): number {
+  return new Date(dateString).getTime();
+}
+
+/**
+ * Extracts SSL data from the given certificate.
+ * @param cert 
+ * @returns  An object containing the SSL data.
+ */
+function extractSslData(cert: any): any {
+  const validToTimestamp = dateToTimestamp(cert.valid_to);
+  const validFromTimestamp = dateToTimestamp(cert.valid_from);
+
+  return {
+    subject: cert.subject as { [key: string]: string | string[] },
+    issuer: cert.issuer as { [key: string]: string | string[] },
+    valid: validToTimestamp > Date.now() as boolean,
+    validFrom: validFromTimestamp,
+    validTo: validToTimestamp
   };
-  httpStatus: number;
 }
 
 /**
@@ -29,18 +82,37 @@ interface DomainInfo {
  */
 export async function fetchDomainInfo(domain: string): Promise<DomainInfo | undefined> {
   try {
+    if (!domain) {
+      throw new Error("Domain name cannot be empty");
+    }
+
+    if (!checkDomain(domain)) {
+      throw new Error("Invalid domain name");
+    }
+
     const formattedDomain = formatDomain(domain);
     const [sslData, serverData, dnsData, httpStatus] = await Promise.all([
-      getSslData(formattedDomain),
-      getServerData(formattedDomain),
-      getDnsData(formattedDomain),
+      getSslData(formattedDomain)
+        .catch((error) => {
+          throw new Error("Could not fetch SSL data for domain " + domain + ". Error: " + error.message);
+        }),
+      getServerData(formattedDomain).catch((error) => {
+        throw new Error("Could not fetch server data for domain " + domain + ". Error: " + error.message);
+      }),
+      getDnsData(formattedDomain).catch((error) => {
+        throw new Error("Could not fetch DNS data for domain " + domain + ". Error: " + error.message);
+      }),
       getHttpStatus(formattedDomain),
     ]);
 
+    if (!sslData) {
+      throw new Error("Could not fetch SSL data for domain");
+    }
+
     return { sslData, serverData, dnsData, httpStatus };
+
   } catch (error) {
-    console.error(error);
-    return undefined;
+    throw error;
   }
 }
 
@@ -51,17 +123,14 @@ export async function fetchDomainInfo(domain: string): Promise<DomainInfo | unde
  */
 async function getSslData(domain: string): Promise<any> {
   return new Promise((resolve, reject) => {
-    const req = https.request(`https://${domain}`, { method: 'HEAD' }, (res) => {
+    https.request(`https://${domain}`, { method: 'HEAD' }, (res) => {
       const socket = res.socket as CustomSocket;
-      resolve(socket.getPeerCertificate(true));
+      const cert = socket.getPeerCertificate(true);
+      resolve(extractSslData(cert));
       socket.destroy();
-    });
-
-    req.on('error', (error) => {
+    }).on('error', (error) => {
       reject(error);
-    });
-
-    req.end();
+    }).end();
   });
 }
 
@@ -72,20 +141,16 @@ async function getSslData(domain: string): Promise<any> {
  */
 async function getServerData(domain: string): Promise<string | undefined> {
   return new Promise((resolve, reject) => {
-    const req = https.request(`https://${domain}`, { method: 'HEAD' }, (res) => {
+    https.request(`https://${domain}`, { method: 'HEAD' }, (res) => {
       const serverHeaderValue = res.headers['server'];
       if (Array.isArray(serverHeaderValue)) {
         resolve(serverHeaderValue[0]);
       } else {
         resolve(serverHeaderValue);
       }
-    });
-
-    req.on('error', (error) => {
+    }).on('error', (error) => {
       reject(error);
-    });
-
-    req.end();
+    }).end();
   });
 }
 
@@ -230,23 +295,10 @@ function getSoaRecord(domain: string): Promise<dns.SoaRecord | null> {
  */
 async function getHttpStatus(domain: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const req = https.request(`https://${domain}`, { method: 'HEAD' }, (res) => {
+    https.request(`https://${domain}`, { method: 'HEAD' }, (res) => {
       resolve(res.statusCode || 0);
-    });
-
-    req.on('error', (error) => {
+    }).on('error', (error) => {
       reject(error);
-    });
-
-    req.end();
+    }).end();
   });
-}
-
-/**
- * Formats a given domain to `example.com` format.
- * @param domain The domain to format.
- * @returns The formatted domain.
- */
-function formatDomain(domain: string): string {
-  return domain.replace(/^(https?:\/\/)?(www\.)?/i, '').replace(/\/$/, '').toLowerCase();
 }

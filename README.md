@@ -83,7 +83,13 @@ The interface for the object returned by `fetchDomainInfo`.
 
 ```typescript
 interface DomainInfo {
-  sslData: any;
+  sslData: {
+    subject: { [key: string]: string | string[] };
+    issuer: { [key: string]: string | string[] };
+    valid: boolean;
+    validFrom: number;
+    validTo: number;
+  }
   serverData: string | undefined;
   dnsData: {
     A: string[];
@@ -92,8 +98,8 @@ interface DomainInfo {
     MX: Array<{ exchange: string; priority: number }>;
     NS: string[];
     SOA: dns.SoaRecord | null;
-  };
-  httpStatus: number;
+  } | undefined;
+  httpStatus: number | undefined;
 }
 ```
 
