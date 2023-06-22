@@ -1,6 +1,6 @@
-import https from 'https';
+import * as https from 'https';
 import { Socket } from 'net';
-import dns from 'dns';
+import * as dns from 'dns';
 
 // Custom interface for the socket object
 interface CustomSocket extends Socket {
