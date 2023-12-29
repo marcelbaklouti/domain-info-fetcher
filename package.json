@@ -31,7 +31,7 @@
   },
   "homepage": "https://github.com/marcelbaklouti/domain-info-fetcher#readme",
   "dependencies": {
-    "ts-node": "^10.9.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.0.4"
   },
   "devDependencies": {
