@@ -160,6 +160,17 @@ interface DomainInfo {
     valid: boolean;
     validFrom: number; // Timestamp
     validTo: number; // Timestamp
+    // PEM-encoded certificates (available since v2.1.0)
+    certificate?: string; // PEM-encoded server certificate
+    intermediateCertificate?: string; // PEM-encoded intermediate certificate
+    rootCertificate?: string; // PEM-encoded root certificate
+    // Human-readable details (available since v2.1.0)
+    details?: {
+      subject: string; // Formatted subject name
+      issuer: string; // Formatted issuer name
+      validFrom: Date; // Validity start date as Date object
+      validTo: Date; // Validity end date as Date object
+    };
   };
 
   // Server software (if available)
@@ -279,6 +290,65 @@ async function checkMultipleDomains(domains: string[]) {
 // Example usage
 checkMultipleDomains(["example.com", "github.com", "blog.medium.com"]);
 ```
+
+### Working with Certificate Data
+
+The package now provides PEM-encoded certificates and human-readable certificate details:
+
+```typescript
+import { fetchDomainInfo } from "domain-info-fetcher";
+import * as fs from "fs/promises";
+
+async function saveCertificate() {
+  try {
+    const domain = "example.com";
+    const info = await fetchDomainInfo(domain);
+
+    // Access human-readable certificate information
+    if (info.sslData.details) {
+      console.log(`Certificate issued to: ${info.sslData.details.subject}`);
+      console.log(`Certificate issued by: ${info.sslData.details.issuer}`);
+      console.log(
+        `Valid from: ${info.sslData.details.validFrom.toLocaleDateString()}`
+      );
+      console.log(
+        `Valid until: ${info.sslData.details.validTo.toLocaleDateString()}`
+      );
+    }
+
+    // Save PEM-encoded certificates to files
+    if (info.sslData.certificate) {
+      await fs.writeFile(`${domain}-cert.pem`, info.sslData.certificate);
+      console.log(`Server certificate saved to ${domain}-cert.pem`);
+    }
+
+    if (info.sslData.intermediateCertificate) {
+      await fs.writeFile(
+        `${domain}-intermediate.pem`,
+        info.sslData.intermediateCertificate
+      );
+      console.log(
+        `Intermediate certificate saved to ${domain}-intermediate.pem`
+      );
+    }
+
+    if (info.sslData.rootCertificate) {
+      await fs.writeFile(`${domain}-root.pem`, info.sslData.rootCertificate);
+      console.log(`Root certificate saved to ${domain}-root.pem`);
+    }
+  } catch (error) {
+    console.error("Error:", error.message);
+  }
+}
+```
+
+This allows you to:
+
+- Access nicely formatted certificate issuer and subject information
+- Work with date objects instead of timestamps
+- Extract and save certificates for further processing
+- Implement certificate pinning in your applications
+- Verify digital signatures using the certificate data
 
 ## Error Handling
 

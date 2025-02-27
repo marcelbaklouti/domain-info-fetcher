@@ -23,6 +23,17 @@ interface SslData {
   valid: boolean;
   validFrom: number;
   validTo: number;
+  // New fields for PEM certificates
+  certificate?: string;
+  intermediateCertificate?: string;
+  rootCertificate?: string;
+  // New field for readable details
+  details?: {
+    issuer: string;
+    subject: string;
+    validFrom: Date;
+    validTo: Date;
+  };
 }
 
 // DomainInfo interface to describe the return type of fetchDomainInfo function
@@ -135,12 +146,90 @@ function extractSslData(cert: CertificateData): SslData {
   const validToTimestamp = dateToTimestamp(cert.valid_to);
   const validFromTimestamp = dateToTimestamp(cert.valid_from);
 
+  // Extract human-readable subject and issuer information
+  const subjectCN =
+    typeof cert.subject.CN === "string"
+      ? cert.subject.CN
+      : typeof cert.subject.commonName === "string"
+      ? cert.subject.commonName
+      : Array.isArray(cert.subject.CN)
+      ? cert.subject.CN.join(", ")
+      : Object.values(cert.subject)
+          .map((v) => (Array.isArray(v) ? v.join(", ") : v))
+          .join(", ");
+
+  const issuerCN =
+    typeof cert.issuer.CN === "string"
+      ? cert.issuer.CN
+      : typeof cert.issuer.commonName === "string"
+      ? cert.issuer.commonName
+      : Array.isArray(cert.issuer.CN)
+      ? cert.issuer.CN.join(", ")
+      : Object.values(cert.issuer)
+          .map((v) => (Array.isArray(v) ? v.join(", ") : v))
+          .join(", ");
+
+  // Extract certificates in PEM format if available
+  let certificate: string | undefined = undefined;
+  let intermediateCertificate: string | undefined = undefined;
+  let rootCertificate: string | undefined = undefined;
+
+  try {
+    // The main certificate PEM
+    if (cert.raw) {
+      certificate = `-----BEGIN CERTIFICATE-----\n${cert.raw
+        .toString("base64")
+        .match(/.{1,64}/g)
+        ?.join("\n")}\n-----END CERTIFICATE-----`;
+    }
+
+    // Try to extract intermediate and root certificates if available
+    if (cert.issuerCertificate) {
+      const intermediate = cert.issuerCertificate;
+      if (intermediate.raw) {
+        intermediateCertificate = `-----BEGIN CERTIFICATE-----\n${intermediate.raw
+          .toString("base64")
+          .match(/.{1,64}/g)
+          ?.join("\n")}\n-----END CERTIFICATE-----`;
+      }
+
+      // Root certificate (if chain available)
+      if (
+        intermediate.issuerCertificate &&
+        intermediate.issuerCertificate.raw
+      ) {
+        rootCertificate = `-----BEGIN CERTIFICATE-----\n${intermediate.issuerCertificate.raw
+          .toString("base64")
+          .match(/.{1,64}/g)
+          ?.join("\n")}\n-----END CERTIFICATE-----`;
+      }
+    }
+  } catch (error) {
+    // Silently handle certificate extraction errors
+    // This ensures backward compatibility - if certificate extraction fails,
+    // we'll still return the existing fields
+  }
+
   return {
+    // Original fields (for backward compatibility)
     subject: cert.subject,
     issuer: cert.issuer,
     valid: validToTimestamp > Date.now(),
     validFrom: validFromTimestamp,
     validTo: validToTimestamp,
+
+    // New certificate fields
+    certificate,
+    intermediateCertificate,
+    rootCertificate,
+
+    // Human-readable details
+    details: {
+      subject: subjectCN,
+      issuer: issuerCN,
+      validFrom: new Date(validFromTimestamp),
+      validTo: new Date(validToTimestamp),
+    },
   };
 }
 

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-02-27
+
+### Added
+
+- Added PEM-encoded certificate access with new properties in the `sslData` object:
+  - `certificate`: The server's PEM-encoded certificate
+  - `intermediateCertificate`: The PEM-encoded intermediate certificate (if available)
+  - `rootCertificate`: The PEM-encoded root certificate (if available)
+- Added human-readable certificate details in a new `details` property:
+  - `subject`: Formatted readable subject name
+  - `issuer`: Formatted readable issuer name
+  - `validFrom`: Certificate validity start date as JavaScript Date object
+  - `validTo`: Certificate validity end date as JavaScript Date object
+- New example in documentation showing how to save certificates to files and access the human-readable details
+
+### Changed
+
+- Enhanced the certificate data extraction process to include PEM formats
+- Improved type definitions for better TypeScript support
+
 ## [2.1.0] - 2025-02-27
 
 ### Added
