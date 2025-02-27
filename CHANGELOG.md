@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-02-27
+
+### Added
+
+- Support for subdomains like `blog.example.com`
+- New utility functions `extractSubdomain` and `getRootDomain` to work with subdomain structures
+- Intelligent DNS record handling for subdomains: A and CNAME records are fetched from the subdomain, while MX, TXT, NS, and SOA records are fetched from the root domain
+- New example demonstrating subdomain functionality: `examples/subdomain-usage.ts`
+- Enhanced CLI with subdomain detection and helpful messages for subdomain queries
+- Updated documentation with comprehensive subdomain examples and explanations
+
+### Changed
+
+- DNS resolution logic improved to handle subdomain hierarchies
+- CLI help text expanded to include subdomain usage examples
+
 ## [2.0.1] - 2025-02-27
 
 ### Fixed
