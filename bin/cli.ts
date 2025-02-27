@@ -88,23 +88,57 @@ async function main() {
 
     // SSL Certificate Information
     console.log("\n" + chalk.green.bold("🔒 SSL Certificate:"));
-    console.log(`  - Issued to: ${JSON.stringify(domainInfo.sslData.subject)}`);
-    console.log(`  - Issued by: ${JSON.stringify(domainInfo.sslData.issuer)}`);
-    console.log(
-      `  - Valid: ${
-        domainInfo.sslData.valid ? chalk.green("✅ Yes") : chalk.red("❌ No")
-      }`
-    );
-    console.log(
-      `  - Valid from: ${new Date(
-        domainInfo.sslData.validFrom
-      ).toLocaleDateString()}`
-    );
-    console.log(
-      `  - Valid until: ${new Date(
-        domainInfo.sslData.validTo
-      ).toLocaleDateString()}`
-    );
+
+    // Display human-readable details if available
+    if (domainInfo.sslData.details) {
+      console.log(`  - Issued to: ${domainInfo.sslData.details.subject}`);
+      console.log(`  - Issued by: ${domainInfo.sslData.details.issuer}`);
+      console.log(
+        `  - Valid: ${
+          domainInfo.sslData.valid ? chalk.green("✅ Yes") : chalk.red("❌ No")
+        }`
+      );
+      console.log(
+        `  - Valid from: ${domainInfo.sslData.details.validFrom.toLocaleDateString()}`
+      );
+      console.log(
+        `  - Valid until: ${domainInfo.sslData.details.validTo.toLocaleDateString()}`
+      );
+      console.log(
+        `  - Days until expiration: ${Math.floor(
+          (domainInfo.sslData.details.validTo.getTime() - Date.now()) /
+            (1000 * 60 * 60 * 24)
+        )}`
+      );
+    } else {
+      // Fallback to original display format
+      console.log(
+        `  - Issued to: ${JSON.stringify(domainInfo.sslData.subject)}`
+      );
+      console.log(
+        `  - Issued by: ${JSON.stringify(domainInfo.sslData.issuer)}`
+      );
+      console.log(
+        `  - Valid: ${
+          domainInfo.sslData.valid ? chalk.green("✅ Yes") : chalk.red("❌ No")
+        }`
+      );
+      console.log(
+        `  - Valid from: ${new Date(
+          domainInfo.sslData.validFrom
+        ).toLocaleDateString()}`
+      );
+      console.log(
+        `  - Valid until: ${new Date(
+          domainInfo.sslData.validTo
+        ).toLocaleDateString()}`
+      );
+    }
+
+    // Show certificate availability
+    if (domainInfo.sslData.certificate) {
+      console.log(`  - ${chalk.green("✅")} PEM certificate available`);
+    }
 
     // Server Information
     console.log("\n" + chalk.cyan.bold("🖥️ Server:"));
