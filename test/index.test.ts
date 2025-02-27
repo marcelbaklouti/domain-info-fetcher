@@ -29,6 +29,52 @@ describe("fetchDomainInfo", () => {
     expect(domainInfo?.sslData).toHaveProperty("validFrom");
     expect(domainInfo?.sslData).toHaveProperty("validTo");
 
+    // Check new certificate fields (v2.2.0)
+    expect(domainInfo?.sslData).toHaveProperty("certificate");
+    expect(typeof domainInfo?.sslData.certificate).toBe("string");
+    expect(domainInfo?.sslData.certificate).toContain(
+      "-----BEGIN CERTIFICATE-----"
+    );
+    expect(domainInfo?.sslData.certificate).toContain(
+      "-----END CERTIFICATE-----"
+    );
+
+    // Check intermediate and root certificates (might be undefined on some domains)
+    expect(domainInfo?.sslData).toHaveProperty("intermediateCertificate");
+    if (domainInfo?.sslData.intermediateCertificate) {
+      expect(domainInfo?.sslData.intermediateCertificate).toContain(
+        "-----BEGIN CERTIFICATE-----"
+      );
+      expect(domainInfo?.sslData.intermediateCertificate).toContain(
+        "-----END CERTIFICATE-----"
+      );
+    }
+
+    expect(domainInfo?.sslData).toHaveProperty("rootCertificate");
+    if (domainInfo?.sslData.rootCertificate) {
+      expect(domainInfo?.sslData.rootCertificate).toContain(
+        "-----BEGIN CERTIFICATE-----"
+      );
+      expect(domainInfo?.sslData.rootCertificate).toContain(
+        "-----END CERTIFICATE-----"
+      );
+    }
+
+    // Check details object (v2.2.0)
+    expect(domainInfo?.sslData).toHaveProperty("details");
+    expect(domainInfo?.sslData.details).toHaveProperty("subject");
+    expect(domainInfo?.sslData.details).toHaveProperty("issuer");
+    expect(domainInfo?.sslData.details).toHaveProperty("validFrom");
+    expect(domainInfo?.sslData.details).toHaveProperty("validTo");
+
+    // Ensure details.validFrom and validTo are Date objects
+    expect(domainInfo?.sslData.details?.validFrom instanceof Date).toBe(true);
+    expect(domainInfo?.sslData.details?.validTo instanceof Date).toBe(true);
+
+    // Human-readable subject and issuer should be strings
+    expect(typeof domainInfo?.sslData.details?.subject).toBe("string");
+    expect(typeof domainInfo?.sslData.details?.issuer).toBe("string");
+
     // Check DNS data
     expect(Array.isArray(domainInfo?.dnsData?.A)).toBe(true);
     expect(domainInfo?.dnsData?.A.length).toBeGreaterThan(0);

@@ -148,24 +148,24 @@ function extractSslData(cert: CertificateData): SslData {
 
   // Extract human-readable subject and issuer information
   const subjectCN =
-    typeof cert.subject.CN === "string"
+    typeof cert.subject?.CN === "string"
       ? cert.subject.CN
-      : typeof cert.subject.commonName === "string"
+      : typeof cert.subject?.commonName === "string"
       ? cert.subject.commonName
-      : Array.isArray(cert.subject.CN)
+      : Array.isArray(cert.subject?.CN)
       ? cert.subject.CN.join(", ")
-      : Object.values(cert.subject)
+      : Object.values(cert.subject || {})
           .map((v) => (Array.isArray(v) ? v.join(", ") : v))
           .join(", ");
 
   const issuerCN =
-    typeof cert.issuer.CN === "string"
+    typeof cert.issuer?.CN === "string"
       ? cert.issuer.CN
-      : typeof cert.issuer.commonName === "string"
+      : typeof cert.issuer?.commonName === "string"
       ? cert.issuer.commonName
-      : Array.isArray(cert.issuer.CN)
+      : Array.isArray(cert.issuer?.CN)
       ? cert.issuer.CN.join(", ")
-      : Object.values(cert.issuer)
+      : Object.values(cert.issuer || {})
           .map((v) => (Array.isArray(v) ? v.join(", ") : v))
           .join(", ");
 
