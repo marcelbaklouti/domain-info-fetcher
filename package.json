@@ -1,6 +1,6 @@
 {
   "name": "domain-info-fetcher",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "A package to fetch information about a domain including SSL/TLS certificate, server informations, DNS records and HTTP status codes",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -24,6 +24,7 @@
     "example": "ts-node examples/basic-usage.ts",
     "example:multi": "ts-node examples/multiple-domains.ts",
     "example:subdomain": "ts-node examples/subdomain-usage.ts",
+    "example:certificate": "ts-node examples/certificate-usage.ts",
     "cli": "ts-node bin/cli.ts"
   },
   "engines": {
