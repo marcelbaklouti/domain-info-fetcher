@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
@@ -58,16 +59,16 @@ jobs:
       - name: Generate Release Notes
         id: release_notes
         run: |
-          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
-          git log $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD^)..HEAD --pretty=format:"- %s" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          RELEASE_NOTES=$(git log $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD^)..HEAD --pretty=format:"- %s")
+          echo "notes=${RELEASE_NOTES//$'\n'/%0A}" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         if: success()
         run: |
+          echo "${{ steps.release_notes.outputs.notes }}" > release_notes.txt
           gh release create v${{ steps.get_version.outputs.version }} \
             --title "Release v${{ steps.get_version.outputs.version }}" \
-            --notes "${{ steps.release_notes.outputs.NOTES }}"
+            --notes-file release_notes.txt
         env:
           GH_TOKEN: ${{ github.token }}
 
