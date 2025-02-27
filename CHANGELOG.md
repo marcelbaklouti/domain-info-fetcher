@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2025-02-27
+
+### Fixed
+
+- ESM compatibility issue with chalk package by downgrading to a CommonJS compatible version
+- Error `ERR_REQUIRE_ESM` when running CLI with ts-node due to chalk v5+ being ESM-only while project uses CommonJS
+
 ## [2.0.0] - 2025-02-27
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "domain-info-fetcher",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "A package to fetch information about a domain including SSL/TLS certificate, server informations, DNS records and HTTP status codes",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -47,16 +47,16 @@
   },
   "homepage": "https://github.com/marcelbaklouti/domain-info-fetcher#readme",
   "dependencies": {
-    "chalk": "^5.4.1"
+    "chalk": "^4.1.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
-    "@types/node": "^18.15.3",
+    "@types/node": "^18.19.76",
     "@typescript-eslint/eslint-plugin": "^8.25.0",
     "@typescript-eslint/parser": "^8.25.0",
     "eslint": "^9.21.0",
-    "prettier": "^3.5.2",
     "jest": "^29.7.0",
+    "prettier": "^3.5.2",
     "ts-jest": "^29.2.6",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
