@@ -1,6 +1,6 @@
 {
   "name": "domain-info-fetcher",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "A package to fetch information about a domain including SSL/TLS certificate, server informations, DNS records and HTTP status codes",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,6 +23,7 @@
     "pnpm:lockfile": "pnpm install --lockfile-only",
     "example": "ts-node examples/basic-usage.ts",
     "example:multi": "ts-node examples/multiple-domains.ts",
+    "example:subdomain": "ts-node examples/subdomain-usage.ts",
     "cli": "ts-node bin/cli.ts"
   },
   "engines": {
@@ -54,7 +55,7 @@
     "@types/node": "^18.19.76",
     "@typescript-eslint/eslint-plugin": "^8.25.0",
     "@typescript-eslint/parser": "^8.25.0",
-    "eslint": "^9.21.0",
+    "eslint": "^8.57.0",
     "jest": "^29.7.0",
     "prettier": "^3.5.2",
     "ts-jest": "^29.2.6",

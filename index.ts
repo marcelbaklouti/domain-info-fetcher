@@ -74,6 +74,40 @@ export function formatDomain(domain: string): string {
 }
 
 /**
+ * Extracts the subdomain from a given domain.
+ * @param domain The domain to extract the subdomain from.
+ * @returns The subdomain or null if no subdomain is present.
+ */
+export function extractSubdomain(domain: string): string | null {
+  const formattedDomain = formatDomain(domain);
+  const parts = formattedDomain.split(".");
+
+  // Check if there are more than 2 parts (e.g., sub.example.com)
+  if (parts.length > 2) {
+    return parts[0];
+  }
+
+  return null;
+}
+
+/**
+ * Gets the root domain (e.g., example.com) from a domain that may include a subdomain.
+ * @param domain The domain to extract the root domain from.
+ * @returns The root domain.
+ */
+export function getRootDomain(domain: string): string {
+  const formattedDomain = formatDomain(domain);
+  const parts = formattedDomain.split(".");
+
+  // If domain has more than 2 parts, return the last two (e.g., example.com from sub.example.com)
+  if (parts.length > 2) {
+    return parts.slice(-2).join(".");
+  }
+
+  return formattedDomain;
+}
+
+/**
  * Checks if the given domain is valid.
  * @param domain The domain to check.
  * @returns True if the domain is valid, false otherwise.
@@ -120,53 +154,49 @@ export async function fetchDomainInfo(
   domain: string,
   options?: RequestOptions
 ): Promise<DomainInfo | undefined> {
-  try {
-    if (!domain) {
-      throw new Error("Domain name cannot be empty");
-    }
-
-    if (!checkDomain(domain)) {
-      throw new Error("Invalid domain name");
-    }
-
-    const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-    const formattedDomain = formatDomain(domain);
-    const [sslData, serverData, dnsData, httpStatus] = await Promise.all([
-      getSslData(formattedDomain, mergedOptions).catch((error) => {
-        throw new Error(
-          "Could not fetch SSL data for domain " +
-            domain +
-            ". Error: " +
-            error.message
-        );
-      }),
-      getServerData(formattedDomain, mergedOptions).catch((error) => {
-        throw new Error(
-          "Could not fetch server data for domain " +
-            domain +
-            ". Error: " +
-            error.message
-        );
-      }),
-      getDnsData(formattedDomain).catch((error) => {
-        throw new Error(
-          "Could not fetch DNS data for domain " +
-            domain +
-            ". Error: " +
-            error.message
-        );
-      }),
-      getHttpStatus(formattedDomain, mergedOptions),
-    ]);
-
-    if (!sslData) {
-      throw new Error("Could not fetch SSL data for domain");
-    }
-
-    return { sslData, serverData, dnsData, httpStatus };
-  } catch (error) {
-    throw error;
+  if (!domain) {
+    throw new Error("Domain name cannot be empty");
   }
+
+  if (!checkDomain(domain)) {
+    throw new Error("Invalid domain name");
+  }
+
+  const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
+  const formattedDomain = formatDomain(domain);
+  const [sslData, serverData, dnsData, httpStatus] = await Promise.all([
+    getSslData(formattedDomain, mergedOptions).catch((error) => {
+      throw new Error(
+        "Could not fetch SSL data for domain " +
+          domain +
+          ". Error: " +
+          error.message
+      );
+    }),
+    getServerData(formattedDomain, mergedOptions).catch((error) => {
+      throw new Error(
+        "Could not fetch server data for domain " +
+          domain +
+          ". Error: " +
+          error.message
+      );
+    }),
+    getDnsData(formattedDomain).catch((error) => {
+      throw new Error(
+        "Could not fetch DNS data for domain " +
+          domain +
+          ". Error: " +
+          error.message
+      );
+    }),
+    getHttpStatus(formattedDomain, mergedOptions),
+  ]);
+
+  if (!sslData) {
+    throw new Error("Could not fetch SSL data for domain");
+  }
+
+  return { sslData, serverData, dnsData, httpStatus };
 }
 
 /**
@@ -260,6 +290,34 @@ async function getDnsData(
   NS: string[];
   SOA: dns.SoaRecord | null;
 }> {
+  const subdomain = extractSubdomain(domain);
+  const rootDomain = getRootDomain(domain);
+
+  // For a subdomain, we primarily want A and CNAME records of the subdomain itself
+  if (subdomain) {
+    try {
+      const A = await getARecords(domain);
+      const CNAME = await getCNameRecord(domain);
+
+      // For other DNS records, we typically want the root domain information
+      const TXT = await getTxtRecords(rootDomain);
+      const MX = await getMxRecords(rootDomain);
+      const NS = await getNsRecords(rootDomain);
+      const SOA = await getSoaRecord(rootDomain);
+
+      return { A, CNAME, TXT, MX, NS, SOA };
+    } catch (error) {
+      // If looking up the subdomain fails, fall back to the root domain
+      console.error(
+        `Error fetching subdomain DNS data: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      console.log(`Falling back to root domain ${rootDomain}`);
+    }
+  }
+
+  // Standard lookup for root domain or fallback
   const A = await getARecords(domain);
   const CNAME = await getCNameRecord(domain);
   const TXT = await getTxtRecords(domain);

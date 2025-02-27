@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-import { fetchDomainInfo, RequestOptions } from "../index";
+import {
+  fetchDomainInfo,
+  RequestOptions,
+  extractSubdomain,
+  getRootDomain,
+} from "../index";
 import chalk from "chalk";
 
 const args = process.argv.slice(2);
@@ -16,9 +21,15 @@ ${chalk.bold("Options:")}
   --json                Output as JSON
   --help                Show this help message
 
-${chalk.bold("Example:")}
+${chalk.bold("Examples:")}
   domain-info-fetcher example.com
+  domain-info-fetcher blog.example.com     # Subdomains are fully supported
   domain-info-fetcher example.com --timeout 5000 --json
+
+${chalk.bold("Note:")}
+  Subdomains (e.g., blog.example.com) are fully supported.
+  For subdomains, A and CNAME records are fetched for the subdomain itself,
+  while other DNS records (MX, TXT, NS, SOA) are fetched from the root domain.
 `;
 
 // Show help if requested or no domain provided
@@ -43,6 +54,25 @@ if (timeoutIndex !== -1 && args[timeoutIndex + 1]) {
 async function main() {
   try {
     console.log(chalk.blue(`Fetching information for ${domain}...`));
+
+    // Check if the domain is a subdomain
+    const subdomain = extractSubdomain(domain);
+    if (subdomain) {
+      const rootDomain = getRootDomain(domain);
+      console.log(
+        chalk.blue(`Detected subdomain: ${subdomain} of ${rootDomain}`)
+      );
+      console.log(
+        chalk.blue(
+          `For subdomain queries, A and CNAME records are specific to the subdomain,`
+        )
+      );
+      console.log(
+        chalk.blue(
+          `while other DNS records are from the root domain ${rootDomain}`
+        )
+      );
+    }
 
     const domainInfo = await fetchDomainInfo(domain, options);
 
