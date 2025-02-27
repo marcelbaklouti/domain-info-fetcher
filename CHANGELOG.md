@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-02-27
+
+### Added
+
+- CLI interface for running queries directly from the command line
+- Support for custom request options (timeout, headers, redirects)
+- Comprehensive documentation with advanced usage examples
+- Improved test coverage with real network tests
+
+### Changed
+
+- Enhanced error handling with specific error messages for different failure scenarios
+- Improved TypeScript typings for better IDE support
+- Updated all dependencies to their latest versions
+- Restructured the codebase for better maintainability
+
+### Fixed
+
+- Issues with DNS resolution error handling
+- Performance bottlenecks in HTTPS requests
+- Reliability issues when fetching data from servers with non-standard configurations
+
+### Security
+
+- Fixed high severity vulnerability in braces package (GHSA-grv7-fg5c-xmjg) related to uncontrolled resource consumption
+- Fixed moderate severity vulnerability in micromatch package (GHSA-952p-6rrq-rcjv) related to ReDoS
+- Updated multiple dependencies to address potential security issues
+
 ## [1.2.0] - 2023-06-22
 
 ### Fixed
@@ -84,8 +112,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - New Tokens for Workflow in the README.md
-
-- Changelog
 
 ## [1.0.1] - 2023-03-19
 

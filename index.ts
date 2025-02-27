@@ -1,32 +1,65 @@
-import * as https from 'https';
-import { Socket } from 'net';
-import * as dns from 'dns';
+import * as https from "https";
+import { Socket } from "net";
+import * as dns from "dns";
 
 // Custom interface for the socket object
 interface CustomSocket extends Socket {
-  getPeerCertificate(detailed: boolean): any;
+  getPeerCertificate(detailed: boolean): CertificateData;
+}
+
+// Interface for certificate data
+interface CertificateData {
+  subject: { [key: string]: string | string[] };
+  issuer: { [key: string]: string | string[] };
+  valid_from: string;
+  valid_to: string;
+  [key: string]: any;
+}
+
+// SSL data structure
+interface SslData {
+  subject: { [key: string]: string | string[] };
+  issuer: { [key: string]: string | string[] };
+  valid: boolean;
+  validFrom: number;
+  validTo: number;
 }
 
 // DomainInfo interface to describe the return type of fetchDomainInfo function
 interface DomainInfo {
-  sslData: {
-    subject: { [key: string]: string | string[] };
-    issuer: { [key: string]: string | string[] };
-    valid: boolean;
-    validFrom: number;
-    validTo: number;
-  }
+  sslData: SslData;
   serverData: string | undefined;
-  dnsData: {
-    A: string[];
-    CNAME: string | null;
-    TXT: string[];
-    MX: Array<{ exchange: string; priority: number }>;
-    NS: string[];
-    SOA: dns.SoaRecord | null;
-  } | undefined;
+  dnsData:
+    | {
+        A: string[];
+        CNAME: string | null;
+        TXT: string[];
+        MX: Array<{ exchange: string; priority: number }>;
+        NS: string[];
+        SOA: dns.SoaRecord | null;
+      }
+    | undefined;
   httpStatus: number | undefined;
 }
+
+// Options for configuring the fetch request
+export interface RequestOptions {
+  /** Timeout in milliseconds for HTTP requests */
+  timeout?: number;
+  /** Custom headers to include in HTTP requests */
+  headers?: Record<string, string>;
+  /** Whether to follow redirects in HTTP requests */
+  followRedirects?: boolean;
+  /** Maximum number of redirects to follow */
+  maxRedirects?: number;
+}
+
+// Default request options
+const DEFAULT_OPTIONS: RequestOptions = {
+  timeout: 10000, // 10 seconds
+  followRedirects: true,
+  maxRedirects: 5,
+};
 
 /**
  * Formats a given domain to `example.com` format.
@@ -34,9 +67,11 @@ interface DomainInfo {
  * @returns The formatted domain.
  */
 export function formatDomain(domain: string): string {
-  return domain.replace(/^(https?:\/\/)?(www\.)?/i, '').replace(/\/$/, '').toLowerCase();
+  return domain
+    .replace(/^(https?:\/\/)?(www\.)?/i, "")
+    .replace(/\/$/, "")
+    .toLowerCase();
 }
-
 
 /**
  * Checks if the given domain is valid.
@@ -44,7 +79,7 @@ export function formatDomain(domain: string): string {
  * @returns True if the domain is valid, false otherwise.
  */
 export const checkDomain = (domain: string): boolean => {
-  const domainParts = domain.split('.');
+  const domainParts = domain.split(".");
   return domainParts.length > 1 && domainParts[0].length > 0;
 };
 
@@ -59,28 +94,32 @@ export function dateToTimestamp(dateString: string): number {
 
 /**
  * Extracts SSL data from the given certificate.
- * @param cert 
- * @returns  An object containing the SSL data.
+ * @param cert The certificate object
+ * @returns An object containing the SSL data.
  */
-function extractSslData(cert: any): any {
+function extractSslData(cert: CertificateData): SslData {
   const validToTimestamp = dateToTimestamp(cert.valid_to);
   const validFromTimestamp = dateToTimestamp(cert.valid_from);
 
   return {
-    subject: cert.subject as { [key: string]: string | string[] },
-    issuer: cert.issuer as { [key: string]: string | string[] },
-    valid: validToTimestamp > Date.now() as boolean,
+    subject: cert.subject,
+    issuer: cert.issuer,
+    valid: validToTimestamp > Date.now(),
     validFrom: validFromTimestamp,
-    validTo: validToTimestamp
+    validTo: validToTimestamp,
   };
 }
 
 /**
  * Fetches SSL, server, and DNS data for the given domain.
  * @param domain The domain to fetch the information for.
+ * @param options Optional request configuration
  * @returns A Promise that resolves to an object containing the SSL, server, and DNS data.
  */
-export async function fetchDomainInfo(domain: string): Promise<DomainInfo | undefined> {
+export async function fetchDomainInfo(
+  domain: string,
+  options?: RequestOptions
+): Promise<DomainInfo | undefined> {
   try {
     if (!domain) {
       throw new Error("Domain name cannot be empty");
@@ -90,19 +129,34 @@ export async function fetchDomainInfo(domain: string): Promise<DomainInfo | unde
       throw new Error("Invalid domain name");
     }
 
+    const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
     const formattedDomain = formatDomain(domain);
     const [sslData, serverData, dnsData, httpStatus] = await Promise.all([
-      getSslData(formattedDomain)
-        .catch((error) => {
-          throw new Error("Could not fetch SSL data for domain " + domain + ". Error: " + error.message);
-        }),
-      getServerData(formattedDomain).catch((error) => {
-        throw new Error("Could not fetch server data for domain " + domain + ". Error: " + error.message);
+      getSslData(formattedDomain, mergedOptions).catch((error) => {
+        throw new Error(
+          "Could not fetch SSL data for domain " +
+            domain +
+            ". Error: " +
+            error.message
+        );
+      }),
+      getServerData(formattedDomain, mergedOptions).catch((error) => {
+        throw new Error(
+          "Could not fetch server data for domain " +
+            domain +
+            ". Error: " +
+            error.message
+        );
       }),
       getDnsData(formattedDomain).catch((error) => {
-        throw new Error("Could not fetch DNS data for domain " + domain + ". Error: " + error.message);
+        throw new Error(
+          "Could not fetch DNS data for domain " +
+            domain +
+            ". Error: " +
+            error.message
+        );
       }),
-      getHttpStatus(formattedDomain),
+      getHttpStatus(formattedDomain, mergedOptions),
     ]);
 
     if (!sslData) {
@@ -110,7 +164,6 @@ export async function fetchDomainInfo(domain: string): Promise<DomainInfo | unde
     }
 
     return { sslData, serverData, dnsData, httpStatus };
-
   } catch (error) {
     throw error;
   }
@@ -119,38 +172,76 @@ export async function fetchDomainInfo(domain: string): Promise<DomainInfo | unde
 /**
  * Retrieves SSL data for the given domain.
  * @param domain The domain to fetch the SSL data for.
+ * @param options Request configuration options
  * @returns A Promise that resolves to an object containing the SSL data.
  */
-async function getSslData(domain: string): Promise<any> {
+async function getSslData(
+  domain: string,
+  options: RequestOptions = DEFAULT_OPTIONS
+): Promise<SslData> {
   return new Promise((resolve, reject) => {
-    https.request(`https://${domain}`, { method: 'HEAD' }, (res) => {
-      const socket = res.socket as CustomSocket;
-      const cert = socket.getPeerCertificate(true);
-      resolve(extractSslData(cert));
-      socket.destroy();
-    }).on('error', (error) => {
-      reject(error);
-    }).end();
+    const req = https
+      .request(
+        `https://${domain}`,
+        {
+          method: "HEAD",
+          timeout: options.timeout,
+          headers: options.headers || {},
+        },
+        (res) => {
+          const socket = res.socket as CustomSocket;
+          const cert = socket.getPeerCertificate(true);
+          resolve(extractSslData(cert));
+          socket.destroy();
+        }
+      )
+      .on("error", (error) => {
+        reject(error);
+      });
+
+    req.end();
   });
 }
 
 /**
  * Retrieves server data for the given domain.
  * @param domain The domain to fetch the server data for.
+ * @param options Request configuration options
  * @returns A Promise that resolves to a string containing the server data.
  */
-async function getServerData(domain: string): Promise<string | undefined> {
+async function getServerData(
+  domain: string,
+  options: RequestOptions = DEFAULT_OPTIONS
+): Promise<string | undefined> {
   return new Promise((resolve, reject) => {
-    https.request(`https://${domain}`, { method: 'HEAD' }, (res) => {
-      const serverHeaderValue = res.headers['server'];
-      if (Array.isArray(serverHeaderValue)) {
-        resolve(serverHeaderValue[0]);
-      } else {
-        resolve(serverHeaderValue);
-      }
-    }).on('error', (error) => {
-      reject(error);
-    }).end();
+    const req = https
+      .request(
+        `https://${domain}`,
+        {
+          method: "HEAD",
+          timeout: options.timeout,
+          headers: options.headers || {},
+          agent: false, // Disable connection pooling
+        },
+        (res) => {
+          const serverHeaderValue = res.headers["server"];
+          const result = Array.isArray(serverHeaderValue)
+            ? serverHeaderValue[0]
+            : serverHeaderValue;
+
+          // Ensure socket is destroyed
+          if (res.socket) {
+            res.socket.destroy();
+          }
+
+          resolve(result);
+        }
+      )
+      .on("error", (error) => {
+        reject(error);
+      });
+
+    req.end();
   });
 }
 
@@ -159,13 +250,15 @@ async function getServerData(domain: string): Promise<string | undefined> {
  * @param domain The domain to fetch the DNS data for.
  * @returns A Promise that resolves to an object containing the DNS data.
  */
-async function getDnsData(domain: string): Promise<{ 
-  A: string[]; 
-  CNAME: string | null; 
-  TXT: string[]; 
+async function getDnsData(
+  domain: string
+): Promise<{
+  A: string[];
+  CNAME: string | null;
+  TXT: string[];
   MX: Array<{ exchange: string; priority: number }>;
-  NS: string[]; 
-  SOA: dns.SoaRecord | null 
+  NS: string[];
+  SOA: dns.SoaRecord | null;
 }> {
   const A = await getARecords(domain);
   const CNAME = await getCNameRecord(domain);
@@ -203,7 +296,7 @@ function getCNameRecord(domain: string): Promise<string | null> {
   return new Promise((resolve, reject) => {
     dns.resolveCname(domain, (error, addresses) => {
       if (error) {
-        if (error.code === 'ENODATA') {
+        if (error.code === "ENODATA") {
           resolve(null);
         } else {
           reject(error);
@@ -238,7 +331,9 @@ function getTxtRecords(domain: string): Promise<string[]> {
  * @param domain The domain to fetch the MX records for.
  * @returns A Promise that resolves to an array of objects containing the MX records.
  */
-function getMxRecords(domain: string): Promise<Array<{ exchange: string; priority: number }>> {
+function getMxRecords(
+  domain: string
+): Promise<Array<{ exchange: string; priority: number }>> {
   return new Promise((resolve, reject) => {
     dns.resolveMx(domain, (error, records) => {
       if (error) {
@@ -276,7 +371,7 @@ function getSoaRecord(domain: string): Promise<dns.SoaRecord | null> {
   return new Promise((resolve, reject) => {
     dns.resolveSoa(domain, (error, record) => {
       if (error) {
-        if (error.code === 'ENODATA') {
+        if (error.code === "ENODATA") {
           resolve(null);
         } else {
           reject(error);
@@ -291,14 +386,38 @@ function getSoaRecord(domain: string): Promise<dns.SoaRecord | null> {
 /**
  * Retrieves HTTP status for the given domain.
  * @param domain The domain to fetch the HTTP status for.
+ * @param options Request configuration options
  * @returns A Promise that resolves to a number containing the HTTP status.
  */
-async function getHttpStatus(domain: string): Promise<number> {
+async function getHttpStatus(
+  domain: string,
+  options: RequestOptions = DEFAULT_OPTIONS
+): Promise<number> {
   return new Promise((resolve, reject) => {
-    https.request(`https://${domain}`, { method: 'HEAD' }, (res) => {
-      resolve(res.statusCode || 0);
-    }).on('error', (error) => {
-      reject(error);
-    }).end();
+    const req = https
+      .request(
+        `https://${domain}`,
+        {
+          method: "HEAD",
+          timeout: options.timeout,
+          headers: options.headers || {},
+          agent: false, // Disable connection pooling
+        },
+        (res) => {
+          const statusCode = res.statusCode || 0;
+
+          // Ensure socket is destroyed
+          if (res.socket) {
+            res.socket.destroy();
+          }
+
+          resolve(statusCode);
+        }
+      )
+      .on("error", (error) => {
+        reject(error);
+      });
+
+    req.end();
   });
 }
