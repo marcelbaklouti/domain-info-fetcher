@@ -25,6 +25,7 @@ A simple Node.js package to fetch SSL/TLS certificate information, server detail
   - [Processing Multiple Domains](#processing-multiple-domains)
 - [Error Handling](#error-handling)
 - [Examples](#examples)
+- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -391,6 +392,20 @@ npm run example          # Basic domain info
 npm run example:multi    # Multiple domains
 npm run example:subdomain # Subdomain analysis
 ```
+
+## Roadmap
+
+We have an ambitious roadmap for the future of domain-info-fetcher. The project is evolving to better serve both technical and non-technical users, with planned support for:
+
+### Upcoming Versions
+
+- **v2.3.0**: WHOIS data integration using built-in Node.js modules
+- **v2.4.0**: Batch processing system for efficiently handling multiple domains
+- **v3.0.0**: Enhanced CLI and data export capabilities (JSON, CSV, tables)
+- **v3.1.0**: GitHub Pages web interface for non-technical users
+- **v3.2.0**: Dashboard support with specialized formatting and monitoring tools
+
+For detailed information about our development plans, implementation timeline, and how to contribute to specific features, please see our [ROADMAP.md](ROADMAP.md) document.
 
 ## Contributing
 
