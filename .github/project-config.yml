@@ -1,0 +1,75 @@
+# Project board configuration for domain-info-fetcher roadmap
+
+name: "Domain-Info-Fetcher Development"
+description: "Track the implementation of the domain-info-fetcher roadmap"
+
+# Columns for the project board
+columns:
+  - name: "Backlog"
+    description: "Tasks not yet scheduled for implementation"
+  
+  - name: "Phase 1: WHOIS Integration"
+    description: "Tasks related to Version 2.3.0 - WHOIS Integration"
+  
+  - name: "Phase 2: Batch Processing"
+    description: "Tasks related to Version 2.4.0 - Batch Processing Engine"
+  
+  - name: "Phase 3: Interface Enhancements"
+    description: "Tasks related to Version 3.0.0 - Interface Enhancements"
+  
+  - name: "Phase 4: GitHub Pages"
+    description: "Tasks related to Version 3.1.0 - GitHub Pages Web Interface"
+  
+  - name: "Phase 5: Dashboard Support"
+    description: "Tasks related to Version 3.2.0 - Dashboard Support"
+  
+  - name: "In Progress"
+    description: "Tasks currently being worked on"
+  
+  - name: "Review"
+    description: "Tasks ready for review/testing"
+  
+  - name: "Done"
+    description: "Completed tasks"
+
+# Labels for categorizing issues
+labels:
+  - name: "roadmap"
+    color: "0075ca"
+    description: "Related to the project roadmap"
+  
+  - name: "v2.3.0"
+    color: "5319e7"
+    description: "WHOIS Integration"
+  
+  - name: "v2.4.0"
+    color: "fbca04"
+    description: "Batch Processing Engine"
+  
+  - name: "v3.0.0"
+    color: "d93f0b"
+    description: "Interface Enhancements"
+  
+  - name: "v3.1.0"
+    color: "0e8a16"
+    description: "GitHub Pages Web Interface"
+  
+  - name: "v3.2.0"
+    color: "1d76db"
+    description: "Dashboard Support"
+  
+  - name: "bug"
+    color: "d73a4a"
+    description: "Something isn't working"
+  
+  - name: "enhancement"
+    color: "a2eeef"
+    description: "New feature or request"
+  
+  - name: "documentation"
+    color: "0075ca"
+    description: "Documentation improvements"
+  
+  - name: "good first issue"
+    color: "7057ff"
+    description: "Good for newcomers" 
