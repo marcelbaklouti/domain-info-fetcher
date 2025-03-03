@@ -1,7 +1,7 @@
 {
   "name": "domain-info-fetcher",
-  "version": "2.2.1",
-  "description": "A package to fetch information about a domain including SSL/TLS certificate, server informations, DNS records and HTTP status codes",
+  "version": "2.2.2",
+  "description": "A simple but powerful TypeScript/JavaScript tool for fetching and analyzing domain information including SSL certificates (with PEM extraction), DNS records, and server details. Features a user-friendly CLI, full TypeScript support and flexible JSON output. Perfect for domain monitoring, security analysis and certificate management.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -31,6 +31,16 @@
     "node": ">=18.15.0"
   },
   "keywords": [
+    "nodejs",
+    "typescript",
+    "ssl-certificate",
+    "dns-record",
+    "dns-lookup",
+    "security-tools",
+    "cli-tool",
+    "certificate-management",
+    "domain-monitoring",
+    "domain-info",
     "Domain infos",
     "SSL certificate",
     "SSL",

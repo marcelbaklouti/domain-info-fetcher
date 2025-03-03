@@ -39,6 +39,9 @@ A simple Node.js package to fetch SSL/TLS certificate information, server detail
 - 🧩 Intelligent subdomain support with automatic root domain recognition
 - 💻 Command-line interface for quick domain analysis
 - 🚀 Simple, lightweight with minimal dependencies
+- 📋 PEM-encoded certificates for direct use in other applications
+- 🔍 Detailed error messages with helpful troubleshooting suggestions
+- 🛡️ Robust error handling with specific error types
 
 ## Installation
 
@@ -168,7 +171,7 @@ interface DomainInfo {
     // Human-readable details (available since v2.1.0)
     details?: {
       subject: string; // Formatted subject name
-      issuer: string; // Formatted issuer name
+      issuer: string; // Formatted issuer name (prioritizes Organization name over Common Name)
       validFrom: Date; // Validity start date as Date object
       validTo: Date; // Validity end date as Date object
     };
@@ -309,6 +312,10 @@ async function saveCertificate() {
     if (info.sslData.details) {
       console.log(`Certificate issued to: ${info.sslData.details.subject}`);
       console.log(`Certificate issued by: ${info.sslData.details.issuer}`);
+
+      // The issuer name prioritizes the Organization (O) field over Common Name (CN)
+      // For example, it will show "DigiCert Inc" instead of just a CN value
+
       console.log(
         `Valid from: ${info.sslData.details.validFrom.toLocaleDateString()}`
       );
@@ -353,7 +360,7 @@ This allows you to:
 
 ## Error Handling
 
-The package provides specific error messages for different failure scenarios:
+The package provides specific error messages for different failure scenarios with helpful suggestions for troubleshooting:
 
 ```typescript
 import { fetchDomainInfo } from "domain-info-fetcher";
@@ -363,16 +370,35 @@ try {
   // Process successful result
 } catch (error) {
   // Handle specific errors
-  if (error.message.includes("Invalid domain")) {
-    console.error("Please provide a valid domain format");
-  } else if (error.message.includes("SSL data")) {
+  if (error.message.includes("Invalid domain name format")) {
+    console.error("Please provide a valid domain format (e.g., example.com)");
+  } else if (error.message.includes("Could not fetch SSL data")) {
     console.error("SSL certificate issue or HTTPS not supported");
-  } else if (error.message.includes("DNS data")) {
-    console.error("DNS resolution failed");
+    console.error(
+      "Try increasing the timeout or check if the domain supports HTTPS"
+    );
+  } else if (error.message.includes("Could not fetch DNS data")) {
+    console.error(
+      "DNS resolution failed - check domain spelling or DNS connectivity"
+    );
+  } else if (error.message.includes("ETIMEDOUT")) {
+    console.error("Connection timed out - try increasing the timeout value");
   } else {
     console.error("Unknown error:", error.message);
   }
 }
+```
+
+When using the CLI, detailed error suggestions are automatically provided:
+
+```
+❌ Error fetching domain information:
+   Could not fetch SSL data for domain invalid.site. Error code: ENOTFOUND
+
+Suggestion: Domain not found. This could be because:
+  - The domain doesn't exist or is misspelled
+  - Your DNS resolver can't resolve this domain
+  - Check for typos in the domain name
 ```
 
 ## Examples

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2025-03-03
+
+### Changed
+
+- Improved error handling in CLI
+- Improved error handling in the `fetchDomainInfo` function
+- Added helpful error suggestions in CLI output to assist users in troubleshooting common issues
+- Enhanced error messages with more specific details about failure causes
+- Fixed linter warnings in the codebase
+- Improved TypeScript type definitions for SSL certificate data
+- Fixed certificate issuer display to prioritize Organization name over Common Name
+- Updated README.md with enhanced error handling examples and certificate issuer details
+- Updated package description and keywords to better reflect the project's capabilities
+
+## [2.2.1] - 2025-02-27
+
+### Changed
+
+- Updated the README.md
+
 ## [2.2.0] - 2025-02-27
 
 ### Added

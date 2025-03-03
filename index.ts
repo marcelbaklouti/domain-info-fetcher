@@ -13,7 +13,12 @@ interface CertificateData {
   issuer: { [key: string]: string | string[] };
   valid_from: string;
   valid_to: string;
-  [key: string]: any;
+  raw?: Buffer;
+  fingerprint?: string;
+  fingerprint256?: string;
+  serialNumber?: string;
+  issuerCertificate?: CertificateData;
+  [key: string]: unknown;
 }
 
 // SSL data structure
@@ -158,11 +163,18 @@ function extractSslData(cert: CertificateData): SslData {
           .map((v) => (Array.isArray(v) ? v.join(", ") : v))
           .join(", ");
 
+  // Prioritize Organization (O) for issuer information, falling back to CN if not available
   const issuerCN =
-    typeof cert.issuer?.CN === "string"
+    typeof cert.issuer?.O === "string"
+      ? cert.issuer.O
+      : typeof cert.issuer?.organizationName === "string"
+      ? cert.issuer.organizationName
+      : typeof cert.issuer?.CN === "string"
       ? cert.issuer.CN
       : typeof cert.issuer?.commonName === "string"
       ? cert.issuer.commonName
+      : Array.isArray(cert.issuer?.O)
+      ? cert.issuer.O.join(", ")
       : Array.isArray(cert.issuer?.CN)
       ? cert.issuer.CN.join(", ")
       : Object.values(cert.issuer || {})
@@ -204,7 +216,7 @@ function extractSslData(cert: CertificateData): SslData {
           ?.join("\n")}\n-----END CERTIFICATE-----`;
       }
     }
-  } catch (error) {
+  } catch {
     // Silently handle certificate extraction errors
     // This ensures backward compatibility - if certificate extraction fails,
     // we'll still return the existing fields
@@ -248,41 +260,63 @@ export async function fetchDomainInfo(
   }
 
   if (!checkDomain(domain)) {
-    throw new Error("Invalid domain name");
+    throw new Error("Invalid domain name format");
   }
 
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
   const formattedDomain = formatDomain(domain);
   const [sslData, serverData, dnsData, httpStatus] = await Promise.all([
     getSslData(formattedDomain, mergedOptions).catch((error) => {
-      throw new Error(
-        "Could not fetch SSL data for domain " +
-          domain +
-          ". Error: " +
-          error.message
-      );
+      // Enhance error message with more specific details
+      let errorMessage = "Could not fetch SSL data for domain " + domain;
+
+      if (error.code) {
+        errorMessage += ". Error code: " + error.code;
+      }
+
+      if (error.message) {
+        errorMessage += ". Details: " + error.message;
+      }
+
+      throw new Error(errorMessage);
     }),
     getServerData(formattedDomain, mergedOptions).catch((error) => {
-      throw new Error(
-        "Could not fetch server data for domain " +
-          domain +
-          ". Error: " +
-          error.message
-      );
+      // Enhance error message with more specific details
+      let errorMessage = "Could not fetch server data for domain " + domain;
+
+      if (error.code) {
+        errorMessage += ". Error code: " + error.code;
+      }
+
+      if (error.message) {
+        errorMessage += ". Details: " + error.message;
+      }
+
+      throw new Error(errorMessage);
     }),
     getDnsData(formattedDomain).catch((error) => {
-      throw new Error(
-        "Could not fetch DNS data for domain " +
-          domain +
-          ". Error: " +
-          error.message
-      );
+      // Enhance error message with more specific details
+      let errorMessage = "Could not fetch DNS data for domain " + domain;
+
+      if (error.code) {
+        errorMessage += ". Error code: " + error.code;
+      }
+
+      if (error.message) {
+        errorMessage += ". Details: " + error.message;
+      }
+
+      throw new Error(errorMessage);
     }),
     getHttpStatus(formattedDomain, mergedOptions),
   ]);
 
   if (!sslData) {
-    throw new Error("Could not fetch SSL data for domain");
+    throw new Error(
+      "Could not fetch SSL data for domain " +
+        domain +
+        ". The SSL certificate may be invalid or the domain may not support HTTPS."
+    );
   }
 
   return { sslData, serverData, dnsData, httpStatus };
