@@ -7,7 +7,7 @@
 [![Known Vulnerabilities](https://snyk.io/test/github/marcelbaklouti/domain-info-fetcher/badge.svg)](https://snyk.io/test/github/marcelbaklouti/domain-info-fetcher)
 [![GitHub issues](https://img.shields.io/github/issues/marcelbaklouti/domain-info-fetcher.svg)](https://github.com/marcelbaklouti/domain-info-fetcher/issues)
 
-A simple Node.js package to fetch SSL/TLS certificate information, server details, DNS records, and HTTP status codes for any domain or subdomain.
+A comprehensive domain analysis tool for Node.js that provides detailed information about any domain or subdomain. Features rich WHOIS data (including registration dates, expiration monitoring, registrar details, and domain status), SSL/TLS certificate analysis, DNS records, and server information. The intuitive CLI with colorized output makes domain analysis accessible to everyone.
 
 ## Table of Contents
 
@@ -23,6 +23,7 @@ A simple Node.js package to fetch SSL/TLS certificate information, server detail
   - [Subdomain Support](#subdomain-support)
   - [Custom Request Options](#custom-request-options)
   - [Processing Multiple Domains](#processing-multiple-domains)
+  - [Working with WHOIS Data](#working-with-whois-data)
 - [Error Handling](#error-handling)
 - [Examples](#examples)
 - [Roadmap](#roadmap)
@@ -31,13 +32,19 @@ A simple Node.js package to fetch SSL/TLS certificate information, server detail
 
 ## Features
 
-- 🔒 Fetch SSL/TLS certificate data including validity and expiration
-- 🖥️ Get server information and HTTP status codes
-- 🌐 Retrieve comprehensive DNS records (A, CNAME, MX, TXT, NS, SOA)
+- 📋 **Comprehensive WHOIS Information**:
+  - Registrar details with IANA IDs and URLs
+  - Registration, update, and expiration dates with expiry warnings
+  - Domain status codes with human-readable descriptions
+  - Registrant information (when available)
+  - Name servers and raw WHOIS data access
+- 🔒 SSL/TLS certificate data including validity and expiration
+- 🖥️ Server information and HTTP status codes
+- 🌐 Comprehensive DNS records (A, CNAME, MX, TXT, NS, SOA)
+- 🧩 Intelligent subdomain support with automatic root domain recognition
+- 💻 Feature-rich CLI with colorized, structured output
 - 🏗️ Full TypeScript support with detailed typings
 - 🔄 Promise-based API for easy async/await usage
-- 🧩 Intelligent subdomain support with automatic root domain recognition
-- 💻 Command-line interface for quick domain analysis
 - 🚀 Simple, lightweight with minimal dependencies
 - 📋 PEM-encoded certificates for direct use in other applications
 - 🔍 Detailed error messages with helpful troubleshooting suggestions
@@ -80,6 +87,33 @@ async function checkDomain() {
 
     // Show IP addresses
     console.log(`IP Addresses: ${info.dnsData?.A.join(", ")}`);
+
+    // Show WHOIS information (v2.3.0+)
+    if (info.whoisData) {
+      console.log(`Registrar: ${info.whoisData.registrar || "Unknown"}`);
+      console.log(
+        `Creation Date: ${
+          info.whoisData.creationDate
+            ? new Date(info.whoisData.creationDate).toLocaleDateString()
+            : "Unknown"
+        }`
+      );
+      console.log(
+        `Expiration Date: ${
+          info.whoisData.expirationDate
+            ? new Date(info.whoisData.expirationDate).toLocaleDateString()
+            : "Unknown"
+        }`
+      );
+
+      // Check domain status codes
+      if (info.whoisData.statusCodes && info.whoisData.statusCodes.length > 0) {
+        console.log("Domain Status Codes:");
+        info.whoisData.statusCodes.forEach((status) =>
+          console.log(`- ${status}`)
+        );
+      }
+    }
   } catch (error) {
     console.error("Error:", error.message);
   }
@@ -90,7 +124,7 @@ checkDomain();
 
 ## Command Line Interface
 
-The package includes a CLI for quick domain analysis from the terminal:
+The package includes a feature-rich CLI for quick domain analysis from the terminal, with colorized output for better readability:
 
 ```bash
 # Install globally
@@ -105,6 +139,21 @@ domain-info-fetcher blog.example.com
 # Set request timeout and get JSON output
 domain-info-fetcher example.com --timeout 5000 --json
 ```
+
+### CLI Output
+
+The CLI provides a comprehensive, color-coded output with sections for:
+
+- 🔒 **SSL Certificate**: Validity, issuer, expiration dates, and PEM availability
+- 🖥️ **Server Information**: Server software and HTTP status codes
+- 🌐 **DNS Records**: A, CNAME, MX, TXT, and NS records with formatted display
+- 📋 **WHOIS Information**:
+  - Registrar details and IANA IDs
+  - ⏰ Important dates (creation, update, expiration) with color-coded warnings
+  - 👤 Registrant information (when not privacy-protected)
+  - 🔒 Domain status codes with human-readable descriptions
+  - 🌐 Name servers
+  - Sample of the raw WHOIS data with tip for viewing full data
 
 ### CLI Options
 
@@ -194,6 +243,35 @@ interface DomainInfo {
 
   // HTTP status code
   httpStatus: number | undefined;
+
+  // WHOIS data (available since v2.3.0)
+  whoisData?: {
+    // Registration information
+    registrar?: string;
+    registrarUrl?: string;
+    registrarIanaId?: string;
+
+    // Dates
+    creationDate?: Date;
+    updatedDate?: Date;
+    expirationDate?: Date;
+
+    // Contact information (redacted in many cases due to privacy)
+    registrant?: {
+      organization?: string;
+      country?: string;
+      email?: string;
+    };
+
+    // Status codes
+    statusCodes?: string[];
+
+    // Name servers
+    nameServers?: string[];
+
+    // Raw WHOIS response
+    rawText: string;
+  };
 }
 ```
 
@@ -295,68 +373,137 @@ async function checkMultipleDomains(domains: string[]) {
 checkMultipleDomains(["example.com", "github.com", "blog.medium.com"]);
 ```
 
-### Working with Certificate Data
+### Working with WHOIS Data
 
-The package now provides PEM-encoded certificates and human-readable certificate details:
+The package provides comprehensive WHOIS information for domains (added in v2.3.0):
 
 ```typescript
-import { fetchDomainInfo } from "domain-info-fetcher";
-import * as fs from "fs/promises";
+import { fetchDomainInfo, WhoisData } from "domain-info-fetcher";
 
-async function saveCertificate() {
+async function analyzeWhoisData() {
   try {
     const domain = "example.com";
     const info = await fetchDomainInfo(domain);
 
-    // Access human-readable certificate information
-    if (info.sslData.details) {
-      console.log(`Certificate issued to: ${info.sslData.details.subject}`);
-      console.log(`Certificate issued by: ${info.sslData.details.issuer}`);
+    if (info.whoisData) {
+      // Display key WHOIS data
+      console.log(`Domain: ${domain}`);
+      console.log(`Registrar: ${info.whoisData.registrar || "N/A"}`);
+      console.log(`Registrar URL: ${info.whoisData.registrarUrl || "N/A"}`);
 
-      // The issuer name prioritizes the Organization (O) field over Common Name (CN)
-      // For example, it will show "DigiCert Inc" instead of just a CN value
+      if (info.whoisData.registrarIanaId) {
+        console.log(`Registrar IANA ID: ${info.whoisData.registrarIanaId}`);
+      }
 
-      console.log(
-        `Valid from: ${info.sslData.details.validFrom.toLocaleDateString()}`
-      );
-      console.log(
-        `Valid until: ${info.sslData.details.validTo.toLocaleDateString()}`
-      );
-    }
+      // Format and display dates
+      if (info.whoisData.creationDate) {
+        console.log(
+          `Registration Date: ${info.whoisData.creationDate.toLocaleDateString()}`
+        );
+      }
 
-    // Save PEM-encoded certificates to files
-    if (info.sslData.certificate) {
-      await fs.writeFile(`${domain}-cert.pem`, info.sslData.certificate);
-      console.log(`Server certificate saved to ${domain}-cert.pem`);
-    }
+      if (info.whoisData.updatedDate) {
+        console.log(
+          `Last Updated: ${info.whoisData.updatedDate.toLocaleDateString()}`
+        );
+      }
 
-    if (info.sslData.intermediateCertificate) {
-      await fs.writeFile(
-        `${domain}-intermediate.pem`,
-        info.sslData.intermediateCertificate
-      );
-      console.log(
-        `Intermediate certificate saved to ${domain}-intermediate.pem`
-      );
-    }
+      if (info.whoisData.expirationDate) {
+        console.log(
+          `Expiration Date: ${info.whoisData.expirationDate.toLocaleDateString()}`
+        );
 
-    if (info.sslData.rootCertificate) {
-      await fs.writeFile(`${domain}-root.pem`, info.sslData.rootCertificate);
-      console.log(`Root certificate saved to ${domain}-root.pem`);
+        // Calculate days until expiration
+        const now = new Date();
+        const expiry = info.whoisData.expirationDate;
+        const daysRemaining = Math.ceil(
+          (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        // Color code based on proximity to expiration
+        let status = "✅";
+        if (daysRemaining < 30) {
+          status = "⚠️ EXPIRING SOON";
+        } else if (daysRemaining < 0) {
+          status = "❌ EXPIRED";
+        }
+
+        console.log(`Days until expiration: ${daysRemaining} ${status}`);
+      }
+
+      // Display domain status codes
+      if (info.whoisData.statusCodes && info.whoisData.statusCodes.length > 0) {
+        console.log("\nDomain Status Codes:");
+        info.whoisData.statusCodes.forEach((status) => {
+          // Add helpful descriptions for common status codes
+          let description = "";
+          if (status.includes("clientTransferProhibited")) {
+            description = " (Transfer locked by registrar)";
+          } else if (status.includes("clientDeleteProhibited")) {
+            description = " (Deletion protected)";
+          } else if (status.includes("clientUpdateProhibited")) {
+            description = " (Updates restricted)";
+          }
+
+          console.log(`- ${status}${description}`);
+        });
+      }
+
+      // Display registrant information if available
+      if (info.whoisData.registrant) {
+        console.log("\nRegistrant Information:");
+
+        if (info.whoisData.registrant.organization) {
+          console.log(
+            `- Organization: ${info.whoisData.registrant.organization}`
+          );
+        }
+
+        if (info.whoisData.registrant.country) {
+          console.log(`- Country: ${info.whoisData.registrant.country}`);
+        }
+
+        if (info.whoisData.registrant.email) {
+          console.log(`- Email: ${info.whoisData.registrant.email}`);
+        }
+      }
+
+      // Display nameservers
+      if (info.whoisData.nameServers && info.whoisData.nameServers.length > 0) {
+        console.log("\nNameservers:");
+        info.whoisData.nameServers.forEach((ns) => console.log(`- ${ns}`));
+      }
+
+      // Access raw WHOIS text for custom parsing
+      if (info.whoisData.rawText) {
+        console.log("\nRaw WHOIS data excerpt:");
+        // Display first 5 lines
+        const excerpt = info.whoisData.rawText
+          .split("\n")
+          .filter((line) => line.trim() !== "")
+          .slice(0, 5)
+          .join("\n");
+        console.log(excerpt + "...");
+      }
+    } else {
+      console.log(`No WHOIS data available for ${domain}`);
     }
   } catch (error) {
     console.error("Error:", error.message);
   }
 }
+
+analyzeWhoisData();
 ```
 
-This allows you to:
+The enhanced WHOIS data is particularly useful for:
 
-- Access nicely formatted certificate issuer and subject information
-- Work with date objects instead of timestamps
-- Extract and save certificates for further processing
-- Implement certificate pinning in your applications
-- Verify digital signatures using the certificate data
+- Monitoring domain expiration dates with visual alerts
+- Verifying domain ownership information
+- Checking domain status codes with human-readable explanations
+- Retrieving detailed registrar information including IANA IDs
+- Identifying registration and update history
+- Analyzing domain transfer and security settings
 
 ## Error Handling
 
@@ -380,6 +527,10 @@ try {
   } else if (error.message.includes("Could not fetch DNS data")) {
     console.error(
       "DNS resolution failed - check domain spelling or DNS connectivity"
+    );
+  } else if (error.message.includes("Could not fetch WHOIS data")) {
+    console.error(
+      "WHOIS lookup failed - server may be unavailable or rate limiting"
     );
   } else if (error.message.includes("ETIMEDOUT")) {
     console.error("Connection timed out - try increasing the timeout value");
@@ -417,6 +568,8 @@ npm install
 npm run example          # Basic domain info
 npm run example:multi    # Multiple domains
 npm run example:subdomain # Subdomain analysis
+npm run example:certificate # Certificate extraction
+npm run example:whois    # WHOIS data analysis with detailed output
 ```
 
 ## Roadmap
@@ -425,7 +578,7 @@ We have an ambitious roadmap for the future of domain-info-fetcher. The project 
 
 ### Upcoming Versions
 
-- **v2.3.0**: WHOIS data integration using built-in Node.js modules
+- ✅ **v2.3.0**: WHOIS data integration with comprehensive data extraction (Completed)
 - **v2.4.0**: Batch processing system for efficiently handling multiple domains
 - **v3.0.0**: Enhanced CLI and data export capabilities (JSON, CSV, tables)
 - **v3.1.0**: GitHub Pages web interface for non-technical users

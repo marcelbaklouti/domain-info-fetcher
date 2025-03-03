@@ -1,6 +1,7 @@
 import * as https from "https";
 import { Socket } from "net";
 import * as dns from "dns";
+import { WhoisData } from "./src/whois";
 
 // Custom interface for the socket object
 interface CustomSocket extends Socket {
@@ -56,6 +57,8 @@ interface DomainInfo {
       }
     | undefined;
   httpStatus: number | undefined;
+  // New WHOIS data field for version 2.3.0
+  whoisData?: WhoisData;
 }
 
 // Options for configuring the fetch request
@@ -265,7 +268,15 @@ export async function fetchDomainInfo(
 
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
   const formattedDomain = formatDomain(domain);
-  const [sslData, serverData, dnsData, httpStatus] = await Promise.all([
+
+  // Include WHOIS data in the Promise.all array
+  const [
+    sslData,
+    serverData,
+    dnsData,
+    httpStatus,
+    whoisData,
+  ] = await Promise.all([
     getSslData(formattedDomain, mergedOptions).catch((error) => {
       // Enhance error message with more specific details
       let errorMessage = "Could not fetch SSL data for domain " + domain;
@@ -309,6 +320,16 @@ export async function fetchDomainInfo(
       throw new Error(errorMessage);
     }),
     getHttpStatus(formattedDomain, mergedOptions),
+    // Add WHOIS data fetch, but make it optional
+    import("./src/whois")
+      .then((whoisModule) =>
+        whoisModule.getWhoisData(formattedDomain).catch((error) => {
+          // Log the error but don't fail the whole request
+          console.warn(`WHOIS data fetch failed: ${error.message}`);
+          return undefined;
+        })
+      )
+      .catch(() => undefined), // Make WHOIS data optional
   ]);
 
   if (!sslData) {
@@ -319,7 +340,7 @@ export async function fetchDomainInfo(
     );
   }
 
-  return { sslData, serverData, dnsData, httpStatus };
+  return { sslData, serverData, dnsData, httpStatus, whoisData };
 }
 
 /**
@@ -602,3 +623,6 @@ async function getHttpStatus(
     req.end();
   });
 }
+
+// Export WhoisData interface for users
+export { WhoisData } from "./src/whois";
