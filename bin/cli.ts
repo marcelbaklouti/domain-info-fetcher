@@ -51,7 +51,7 @@ if (timeoutIndex !== -1 && args[timeoutIndex + 1]) {
   }
 }
 
-async function main() {
+async function main(): Promise<void> {
   try {
     console.log(chalk.blue(`Fetching information for ${domain}...`));
 
@@ -83,6 +83,11 @@ async function main() {
 
     if (!domainInfo) {
       console.error(chalk.red("No domain information returned"));
+      console.error(
+        chalk.yellow(
+          "Suggestion: Verify that the domain exists and is accessible."
+        )
+      );
       return;
     }
 
@@ -192,6 +197,93 @@ async function main() {
     console.error(chalk.red("❌ Error fetching domain information:"));
     if (error instanceof Error) {
       console.error(chalk.red(`   ${error.message}`));
+
+      // Provide helpful suggestions based on error message
+      if (error.message.includes("Invalid domain name")) {
+        console.error(
+          chalk.yellow(
+            "\nSuggestion: The domain format is invalid. Try using a format like 'example.com' without protocol (http://, https://) or trailing paths."
+          )
+        );
+      } else if (error.message.includes("Could not fetch SSL data")) {
+        console.error(
+          chalk.yellow(
+            "\nSuggestion: SSL connection failed. This could be because:"
+          )
+        );
+        console.error(chalk.yellow("  - The domain doesn't support HTTPS"));
+        console.error(
+          chalk.yellow("  - The SSL certificate is invalid or self-signed")
+        );
+        console.error(
+          chalk.yellow("  - Try using a longer timeout with --timeout option")
+        );
+      } else if (error.message.includes("Could not fetch DNS data")) {
+        console.error(
+          chalk.yellow(
+            "\nSuggestion: DNS resolution failed. This could be because:"
+          )
+        );
+        console.error(chalk.yellow("  - The domain doesn't exist"));
+        console.error(
+          chalk.yellow("  - Your network or DNS resolver is having issues")
+        );
+        console.error(
+          chalk.yellow(
+            "  - Try checking your internet connection or using a different DNS resolver"
+          )
+        );
+      } else if (error.message.includes("Could not fetch server data")) {
+        console.error(
+          chalk.yellow(
+            "\nSuggestion: Server connection failed. This could be because:"
+          )
+        );
+        console.error(chalk.yellow("  - The server is down or not responding"));
+        console.error(
+          chalk.yellow("  - A firewall is blocking the connection")
+        );
+        console.error(
+          chalk.yellow("  - Try increasing the timeout with --timeout option")
+        );
+      } else if (error.message.includes("ENOTFOUND")) {
+        console.error(
+          chalk.yellow("\nSuggestion: Domain not found. This could be because:")
+        );
+        console.error(
+          chalk.yellow("  - The domain doesn't exist or is misspelled")
+        );
+        console.error(
+          chalk.yellow("  - Your DNS resolver can't resolve this domain")
+        );
+        console.error(chalk.yellow("  - Check for typos in the domain name"));
+      } else if (
+        error.message.includes("ETIMEDOUT") ||
+        error.message.includes("timeout")
+      ) {
+        console.error(
+          chalk.yellow(
+            "\nSuggestion: Connection timed out. This could be because:"
+          )
+        );
+        console.error(chalk.yellow("  - The server is slow to respond"));
+        console.error(chalk.yellow("  - Your internet connection is unstable"));
+        console.error(
+          chalk.yellow("  - Try increasing the timeout with --timeout option")
+        );
+      } else if (error.message.includes("ECONNREFUSED")) {
+        console.error(
+          chalk.yellow(
+            "\nSuggestion: Connection refused. This could be because:"
+          )
+        );
+        console.error(
+          chalk.yellow(
+            "  - The server is not accepting connections on port 443 (HTTPS)"
+          )
+        );
+        console.error(chalk.yellow("  - The domain might not support HTTPS"));
+      }
     } else {
       console.error(chalk.red(`   ${String(error)}`));
     }
