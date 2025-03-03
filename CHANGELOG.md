@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2025-03-03
+
+### Added
+
+- WHOIS data integration with new `whoisData` property in the `DomainInfo` object
+- Built-in WHOIS protocol implementation using native Node.js modules
+- TLD-specific WHOIS server mapping for accurate results
+- Data extraction for registration dates, expiration dates, registrar information
+- Domain status codes and registrant information (when available)
+- Caching system for WHOIS queries to respect rate limits
+- CLI now displays WHOIS data including registrar, important dates, and status
+- New example in `examples/whois-usage.ts` demonstrating WHOIS functionality
+- `WhoisData` interface exported for TypeScript users
+- Comprehensive error handling with helpful suggestions for WHOIS-related issues
+
+### Changed
+
+- Enhanced `fetchDomainInfo` to include WHOIS data
+- Made WHOIS data retrieval resilient to failures (won't prevent other data from being returned)
+- Improved CLI error messages for WHOIS-specific errors
+
 ## [2.2.2] - 2025-03-03
 
 ### Changed

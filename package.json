@@ -1,7 +1,7 @@
 {
   "name": "domain-info-fetcher",
-  "version": "2.2.2",
-  "description": "A simple but powerful TypeScript/JavaScript tool for fetching and analyzing domain information including SSL certificates (with PEM extraction), DNS records, and server details. Features a user-friendly CLI, full TypeScript support and flexible JSON output. Perfect for domain monitoring, security analysis and certificate management.",
+  "version": "2.3.0",
+  "description": "A powerful TypeScript/JavaScript tool for comprehensive domain analysis, featuring detailed WHOIS data with registration dates, registrars, and domain status. Offers SSL certificate extraction (with PEM support), DNS records, and server details. Includes a feature-rich CLI with colorized output, full TypeScript support, and flexible data export options. Perfect for domain monitoring, security analysis, and compliance checks.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -25,6 +25,7 @@
     "example:multi": "ts-node examples/multiple-domains.ts",
     "example:subdomain": "ts-node examples/subdomain-usage.ts",
     "example:certificate": "ts-node examples/certificate-usage.ts",
+    "example:whois": "ts-node examples/whois-usage.ts",
     "cli": "ts-node bin/cli.ts"
   },
   "engines": {
@@ -50,7 +51,15 @@
     "DNS records",
     "DNS",
     "HTTP status codes",
-    "HTTP"
+    "HTTP",
+    "WHOIS",
+    "domain-registration",
+    "domain-expiry",
+    "registrar-info",
+    "domain-status",
+    "domain-ownership",
+    "domain-lookup",
+    "domain-analysis"
   ],
   "author": " Marcel Baklouti <marcel@baklouti.de>",
   "license": "MIT",

@@ -193,6 +193,177 @@ async function main(): Promise<void> {
     } else {
       console.log("\n" + chalk.red("🌐 DNS Records: Not available"));
     }
+
+    // WHOIS Information - New in v2.3.0
+    if (domainInfo.whoisData) {
+      console.log("\n" + chalk.magenta.bold("📋 WHOIS Information:"));
+
+      // Registrar information
+      console.log(
+        `  - Registrar: ${
+          domainInfo.whoisData.registrar || chalk.gray("Not available")
+        }`
+      );
+      if (domainInfo.whoisData.registrarUrl) {
+        console.log(`  - Registrar URL: ${domainInfo.whoisData.registrarUrl}`);
+      }
+      if (domainInfo.whoisData.registrarIanaId) {
+        console.log(
+          `  - Registrar IANA ID: ${domainInfo.whoisData.registrarIanaId}`
+        );
+      }
+
+      // Domain dates
+      const datesAvailable =
+        domainInfo.whoisData.creationDate ||
+        domainInfo.whoisData.updatedDate ||
+        domainInfo.whoisData.expirationDate;
+
+      if (datesAvailable) {
+        console.log("\n  " + chalk.magenta.bold("⏰ Important Dates:"));
+      }
+
+      if (domainInfo.whoisData.creationDate) {
+        console.log(
+          `  - Created: ${domainInfo.whoisData.creationDate.toLocaleDateString()}`
+        );
+      }
+
+      if (domainInfo.whoisData.updatedDate) {
+        console.log(
+          `  - Last Updated: ${domainInfo.whoisData.updatedDate.toLocaleDateString()}`
+        );
+      }
+
+      if (domainInfo.whoisData.expirationDate) {
+        const now = new Date();
+        const daysUntilExpiration = Math.floor(
+          (domainInfo.whoisData.expirationDate.getTime() - now.getTime()) /
+            (1000 * 60 * 60 * 24)
+        );
+
+        const expirationColor =
+          daysUntilExpiration < 30
+            ? chalk.red
+            : daysUntilExpiration < 90
+            ? chalk.yellow
+            : chalk.green;
+
+        console.log(
+          `  - Expires: ${domainInfo.whoisData.expirationDate.toLocaleDateString()} (${expirationColor(
+            `${daysUntilExpiration} days`
+          )})`
+        );
+      }
+
+      // Registrant information (if available)
+      if (
+        domainInfo.whoisData.registrant &&
+        (domainInfo.whoisData.registrant.organization ||
+          domainInfo.whoisData.registrant.country ||
+          domainInfo.whoisData.registrant.email)
+      ) {
+        console.log("\n  " + chalk.magenta.bold("👤 Registrant Information:"));
+
+        if (domainInfo.whoisData.registrant.organization) {
+          console.log(
+            `  - Organization: ${domainInfo.whoisData.registrant.organization}`
+          );
+        }
+
+        if (domainInfo.whoisData.registrant.country) {
+          console.log(
+            `  - Country: ${domainInfo.whoisData.registrant.country}`
+          );
+        }
+
+        if (domainInfo.whoisData.registrant.email) {
+          console.log(`  - Email: ${domainInfo.whoisData.registrant.email}`);
+        }
+      }
+
+      // Domain status
+      if (
+        domainInfo.whoisData.statusCodes &&
+        domainInfo.whoisData.statusCodes.length > 0
+      ) {
+        console.log("\n  " + chalk.magenta.bold("🔒 Domain Status:"));
+        domainInfo.whoisData.statusCodes.forEach((status) => {
+          // Color code common status values
+          let statusDisplay = status;
+
+          if (
+            status.includes("clientTransferProhibited") ||
+            status.includes("serverTransferProhibited")
+          ) {
+            statusDisplay =
+              chalk.yellow(status) + " " + chalk.dim("(Transfer locked)");
+          } else if (
+            status.includes("clientDeleteProhibited") ||
+            status.includes("serverDeleteProhibited")
+          ) {
+            statusDisplay =
+              chalk.yellow(status) + " " + chalk.dim("(Deletion protected)");
+          } else if (
+            status.includes("clientUpdateProhibited") ||
+            status.includes("serverUpdateProhibited")
+          ) {
+            statusDisplay =
+              chalk.yellow(status) + " " + chalk.dim("(Updates restricted)");
+          } else if (
+            status.includes("clientHold") ||
+            status.includes("serverHold")
+          ) {
+            statusDisplay =
+              chalk.red(status) + " " + chalk.dim("(Domain not in DNS)");
+          } else if (status.includes("ok")) {
+            statusDisplay = chalk.green(status);
+          }
+
+          console.log(`  - ${statusDisplay}`);
+        });
+      }
+
+      // Name servers from WHOIS
+      if (
+        domainInfo.whoisData.nameServers &&
+        domainInfo.whoisData.nameServers.length > 0
+      ) {
+        console.log(
+          "\n  " + chalk.magenta.bold("🌐 Name Servers (from WHOIS):")
+        );
+        domainInfo.whoisData.nameServers.forEach((ns) => {
+          console.log(`  - ${ns}`);
+        });
+      }
+
+      // Add a sample of the raw WHOIS text
+      if (domainInfo.whoisData.rawText) {
+        console.log("\n  " + chalk.magenta.bold("📝 Sample Raw WHOIS Data:"));
+        // Get first few lines of raw WHOIS text (limited to 5 lines)
+        const rawTextSample = domainInfo.whoisData.rawText
+          .split("\n")
+          .filter((line) => line.trim() !== "")
+          .slice(0, 5)
+          .map((line) => `  ${line}`)
+          .join("\n");
+        console.log(chalk.gray(`${rawTextSample}`));
+        console.log(
+          chalk.dim("  (Showing first 5 non-empty lines of raw WHOIS data)")
+        );
+        console.log(
+          chalk.cyan(
+            "\n  💡 Tip: To view full WHOIS data, use: whois " + domain
+          )
+        );
+      }
+    } else {
+      console.log(
+        "\n" +
+          chalk.magenta("📋 WHOIS Information: ") +
+          chalk.gray("Not available")
+      );
+    }
   } catch (error) {
     console.error(chalk.red("❌ Error fetching domain information:"));
     if (error instanceof Error) {
