@@ -1,5 +1,5 @@
 import * as net from "net";
-import { formatDomain, getRootDomain } from "../index";
+import { formatDomain, getRootDomain } from "./utils";
 
 /**
  * Interface for WHOIS data

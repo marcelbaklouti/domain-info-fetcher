@@ -1,7 +1,14 @@
 import * as https from "https";
 import { Socket } from "net";
 import * as dns from "dns";
-import { WhoisData } from "./src/whois";
+import type { WhoisData } from "./src/whois";
+import {
+  formatDomain,
+  extractSubdomain,
+  getRootDomain,
+  checkDomain,
+  dateToTimestamp,
+} from "./src/utils";
 
 // Custom interface for the socket object
 interface CustomSocket extends Socket {
@@ -85,65 +92,35 @@ const DEFAULT_OPTIONS: RequestOptions = {
  * @param domain The domain to format.
  * @returns The formatted domain.
  */
-export function formatDomain(domain: string): string {
-  return domain
-    .replace(/^(https?:\/\/)?(www\.)?/i, "")
-    .replace(/\/$/, "")
-    .toLowerCase();
-}
+// formatDomain moved to ./src/utils and imported above
 
 /**
  * Extracts the subdomain from a given domain.
  * @param domain The domain to extract the subdomain from.
  * @returns The subdomain or null if no subdomain is present.
  */
-export function extractSubdomain(domain: string): string | null {
-  const formattedDomain = formatDomain(domain);
-  const parts = formattedDomain.split(".");
-
-  // Check if there are more than 2 parts (e.g., sub.example.com)
-  if (parts.length > 2) {
-    return parts[0];
-  }
-
-  return null;
-}
+// extractSubdomain moved to ./src/utils and imported above
 
 /**
  * Gets the root domain (e.g., example.com) from a domain that may include a subdomain.
  * @param domain The domain to extract the root domain from.
  * @returns The root domain.
  */
-export function getRootDomain(domain: string): string {
-  const formattedDomain = formatDomain(domain);
-  const parts = formattedDomain.split(".");
-
-  // If domain has more than 2 parts, return the last two (e.g., example.com from sub.example.com)
-  if (parts.length > 2) {
-    return parts.slice(-2).join(".");
-  }
-
-  return formattedDomain;
-}
+// getRootDomain moved to ./src/utils and imported above
 
 /**
  * Checks if the given domain is valid.
  * @param domain The domain to check.
  * @returns True if the domain is valid, false otherwise.
  */
-export const checkDomain = (domain: string): boolean => {
-  const domainParts = domain.split(".");
-  return domainParts.length > 1 && domainParts[0].length > 0;
-};
+// checkDomain moved to ./src/utils and imported above
 
 /**
  * converts a date string to a timestamp
  * @param dateString
  * @returns timestamp
  */
-export function dateToTimestamp(dateString: string): number {
-  return new Date(dateString).getTime();
-}
+// dateToTimestamp moved to ./src/utils and imported above
 
 /**
  * Extracts SSL data from the given certificate.
@@ -263,7 +240,7 @@ export async function fetchDomainInfo(
   }
 
   if (!checkDomain(domain)) {
-    throw new Error("Invalid domain name format");
+    throw new Error("Invalid domain name");
   }
 
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
@@ -625,4 +602,11 @@ async function getHttpStatus(
 }
 
 // Export WhoisData interface for users
-export { WhoisData } from "./src/whois";
+export type { WhoisData } from "./src/whois";
+export {
+  formatDomain,
+  extractSubdomain,
+  getRootDomain,
+  checkDomain,
+  dateToTimestamp,
+} from "./src/utils";

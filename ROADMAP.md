@@ -115,8 +115,8 @@ domain-info-fetcher 3.0
 
 #### Tasks:
 
-1. Create lightweight serverless backend using Vercel/Netlify
-2. Design user-friendly interface for GitHub Pages
+1. Create lightweight serverless backend using Vercel
+2. Design user-friendly interface using Tailwind CSS and React
 3. Implement client-side form handling and validation
 4. Develop interactive data visualizations
 5. Add export/sharing functionality

@@ -584,7 +584,7 @@ We have an ambitious roadmap for the future of domain-info-fetcher. The project 
 - **v3.1.0**: GitHub Pages web interface for non-technical users
 - **v3.2.0**: Dashboard support with specialized formatting and monitoring tools
 
-For detailed information about our development plans, implementation timeline, and how to contribute to specific features, please see our [ROADMAP.md](ROADMAP.md) document.
+For detailed information about our development plans, implementation timeline, and how to contribute to specific features, please see our CHANGELOG and GitHub Issues.
 
 ## Contributing
 
