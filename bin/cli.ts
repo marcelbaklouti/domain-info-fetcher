@@ -6,476 +6,583 @@ import {
   getRootDomain,
 } from "../index";
 import chalk from "chalk";
+import * as fs from "fs";
+import * as path from "path";
+
+type CliFormat = "json" | "csv" | "table";
 
 const args = process.argv.slice(2);
+
 const helpText = `
 ${chalk.bold("domain-info-fetcher CLI")}
 
-A command-line tool to fetch information about a domain.
+A command-line tool to fetch information about domains (single or batch).
 
 ${chalk.bold("Usage:")}
   domain-info-fetcher <domain> [options]
+  domain-info-fetcher --file domains.txt [options]
 
 ${chalk.bold("Options:")}
   --timeout <ms>        Set request timeout in milliseconds (default: 10000)
-  --json                Output as JSON
+  --format <fmt>        Output format: json | csv | table (default: table)
+  --out <file>          Write output to file (JSON/CSV/table text)
+  --file <path>         Read domains from file (one per line)
+  --concurrency <n>     Concurrent lookups when using --file (default: 5)
+  --include <parts>     Only include sections (csv/json and printed sections). Comma-separated of: ssl,server,dns,http,whois
+  --exclude <parts>     Exclude sections (takes precedence if both set)
+  --json                Shortcut for --format json
   --help                Show this help message
 
 ${chalk.bold("Examples:")}
   domain-info-fetcher example.com
-  domain-info-fetcher blog.example.com     # Subdomains are fully supported
-  domain-info-fetcher example.com --timeout 5000 --json
+  domain-info-fetcher blog.example.com --timeout 5000 --format json
+  domain-info-fetcher --file domains.txt --concurrency 10 --format csv --out results.csv
+  domain-info-fetcher example.com --include ssl,whois
 
-${chalk.bold("Note:")}
-  Subdomains (e.g., blog.example.com) are fully supported.
-  For subdomains, A and CNAME records are fetched for the subdomain itself,
-  while other DNS records (MX, TXT, NS, SOA) are fetched from the root domain.
+${chalk.bold("Notes:")}
+  - Subdomains are fully supported. For subdomains, A and CNAME records are fetched
+    for the subdomain, while MX, TXT, NS, and SOA are fetched from the root domain.
 `;
 
-// Show help if requested or no domain provided
-if (args.includes("--help") || args.length === 0) {
+function parseListFlag(name: string): Set<string> | null {
+  const idx = args.indexOf(name);
+  if (idx !== -1 && args[idx + 1]) {
+    return new Set(
+      args[idx + 1]
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+    );
+  }
+  return null;
+}
+
+function getArgValue(name: string): string | undefined {
+  const idx = args.indexOf(name);
+  if (idx !== -1) {
+    return args[idx + 1];
+  }
+  return undefined;
+}
+
+function printHelpAndExit(): never {
   console.log(helpText);
   process.exit(0);
 }
 
-// Parse arguments
-const domain = args[0];
-const jsonOutput = args.includes("--json");
-const timeoutIndex = args.indexOf("--timeout");
-const options: RequestOptions = {};
+function pickSections<T extends Record<string, unknown>>(
+  obj: T,
+  include: Set<string> | null,
+  exclude: Set<string> | null
+): Partial<T> {
+  const map: Record<string, string> = {
+    ssl: "sslData",
+    server: "serverData",
+    dns: "dnsData",
+    http: "httpStatus",
+    whois: "whoisData",
+  };
+  const result: Partial<T> = {};
+  const keys = Object.keys(map);
+  for (const k of keys) {
+    const key = map[k];
+    const shouldInclude =
+      (include === null || include.has(k)) && !(exclude && exclude.has(k));
+    if (shouldInclude && key in obj) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (result as any)[key] = (obj as any)[key];
+    }
+  }
+  return result;
+}
 
-if (timeoutIndex !== -1 && args[timeoutIndex + 1]) {
-  const timeout = parseInt(args[timeoutIndex + 1], 10);
-  if (!isNaN(timeout)) {
-    options.timeout = timeout;
+function sanitizeDomainList(domains: string[]): string[] {
+  return domains
+    .map((d) => d.trim())
+    .filter((d) => d.length > 0 && !d.startsWith("#"));
+}
+
+async function readDomainsFromFile(filePath: string): Promise<string[]> {
+  const abs = path.resolve(process.cwd(), filePath);
+  const content = await fs.promises.readFile(abs, "utf8");
+  return sanitizeDomainList(content.split(/\r?\n/));
+}
+
+function toCsvValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const str = typeof value === "string" ? value : JSON.stringify(value);
+  if (str.includes(",") || str.includes("\n") || str.includes("\"")) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function buildCsv(
+  rows: Array<Record<string, unknown>>,
+  headers: string[]
+): string {
+  const lines = [headers.join(",")];
+  for (const row of rows) {
+    const line = headers.map((h) => toCsvValue(row[h])).join(",");
+    lines.push(line);
+  }
+  return lines.join("\n");
+}
+
+function summarizeRow(domain: string, info: any): Record<string, unknown> {
+  const sslValid = info?.sslData?.valid ?? null;
+  const sslValidTo = info?.sslData?.validTo
+    ? new Date(info.sslData.validTo).toISOString()
+    : null;
+  const http = info?.httpStatus ?? null;
+  const server = info?.serverData ?? null;
+  const aCount = Array.isArray(info?.dnsData?.A) ? info.dnsData.A.length : 0;
+  const cname = info?.dnsData?.CNAME ?? null;
+  const mxCount = Array.isArray(info?.dnsData?.MX) ? info.dnsData.MX.length : 0;
+  const nsCount = Array.isArray(info?.dnsData?.NS) ? info.dnsData.NS.length : 0;
+  const txtCount = Array.isArray(info?.dnsData?.TXT)
+    ? info.dnsData.TXT.length
+    : 0;
+  const registrar = info?.whoisData?.registrar ?? null;
+  const creation = info?.whoisData?.creationDate
+    ? new Date(info.whoisData.creationDate).toISOString()
+    : null;
+  const expiration = info?.whoisData?.expirationDate
+    ? new Date(info.whoisData.expirationDate).toISOString()
+    : null;
+  let daysToExpiry: number | null = null;
+  if (info?.whoisData?.expirationDate) {
+    const now = Date.now();
+    const exp = new Date(info.whoisData.expirationDate).getTime();
+    daysToExpiry = Math.floor((exp - now) / (1000 * 60 * 60 * 24));
+  }
+  return {
+    domain,
+    http_status: http,
+    server,
+    ssl_valid: sslValid,
+    ssl_valid_to: sslValidTo,
+    a_count: aCount,
+    cname,
+    mx_count: mxCount,
+    ns_count: nsCount,
+    txt_count: txtCount,
+    whois_registrar: registrar,
+    whois_creation: creation,
+    whois_expiration: expiration,
+    whois_days_to_expiry: daysToExpiry,
+  };
+}
+
+async function fetchOne(domain: string, options: RequestOptions) {
+  try {
+    const info = await fetchDomainInfo(domain, options);
+    return { domain, info } as const;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { domain, error: message } as const;
   }
 }
 
-async function main(): Promise<void> {
-  try {
-    console.log(chalk.blue(`Fetching information for ${domain}...`));
+async function processWithConcurrency(
+  domains: string[],
+  options: RequestOptions,
+  concurrency: number,
+  onProgress?: (done: number, total: number, item: {
+    domain: string;
+    info?: unknown;
+    error?: string;
+  }) => void
+): Promise<Array<{ domain: string; info?: unknown; error?: string }>> {
+  const total = domains.length;
+  let done = 0;
+  const results: Array<{ domain: string; info?: unknown; error?: string }> = [];
+  let index = 0;
 
-    // Check if the domain is a subdomain
-    const subdomain = extractSubdomain(domain);
-    if (subdomain) {
-      const rootDomain = getRootDomain(domain);
-      console.log(
-        chalk.blue(`Detected subdomain: ${subdomain} of ${rootDomain}`)
-      );
-      console.log(
-        chalk.blue(
-          `For subdomain queries, A and CNAME records are specific to the subdomain,`
-        )
-      );
-      console.log(
-        chalk.blue(
-          `while other DNS records are from the root domain ${rootDomain}`
-        )
-      );
+  async function worker() {
+    while (true) {
+      const current = index < domains.length ? domains[index++] : undefined;
+      if (!current) break;
+      const res = await fetchOne(current, options);
+      results.push(res);
+      done++;
+      if (onProgress) onProgress(done, total, res);
     }
+  }
 
-    const domainInfo = await fetchDomainInfo(domain, options);
+  const workers = Array.from({ length: Math.min(concurrency, total) }, () =>
+    worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
 
-    if (jsonOutput) {
-      console.log(JSON.stringify(domainInfo, null, 2));
-      return;
-    }
+function renderSingle(domain: string, info: any, include: Set<string> | null, exclude: Set<string> | null) {
+  console.log(chalk.blue(`Fetching information for ${domain}...`));
 
-    if (!domainInfo) {
-      console.error(chalk.red("No domain information returned"));
-      console.error(
-        chalk.yellow(
-          "Suggestion: Verify that the domain exists and is accessible."
-        )
-      );
-      return;
-    }
+  const subdomain = extractSubdomain(domain);
+  if (subdomain) {
+    const rootDomain = getRootDomain(domain);
+    console.log(chalk.blue(`Detected subdomain: ${subdomain} of ${rootDomain}`));
+    console.log(
+      chalk.blue(
+        `For subdomain queries, A and CNAME records are specific to the subdomain,`
+      )
+    );
+    console.log(
+      chalk.blue(
+        `while other DNS records are from the root domain ${rootDomain}`
+      )
+    );
+  }
 
-    // SSL Certificate Information
+  const allow = (k: string) => (include === null || include.has(k)) && !(exclude && exclude.has(k));
+
+  if (allow("ssl")) {
     console.log("\n" + chalk.green.bold("🔒 SSL Certificate:"));
-
-    // Display human-readable details if available
-    if (domainInfo.sslData.details) {
-      console.log(`  - Issued to: ${domainInfo.sslData.details.subject}`);
-      console.log(`  - Issued by: ${domainInfo.sslData.details.issuer}`);
+    if (info.sslData?.details) {
+      console.log(`  - Issued to: ${info.sslData.details.subject}`);
+      console.log(`  - Issued by: ${info.sslData.details.issuer}`);
       console.log(
-        `  - Valid: ${
-          domainInfo.sslData.valid ? chalk.green("✅ Yes") : chalk.red("❌ No")
-        }`
+        `  - Valid: ${info.sslData.valid ? chalk.green("✅ Yes") : chalk.red("❌ No")}`
       );
+      console.log(`  - Valid from: ${new Date(info.sslData.details.validFrom).toLocaleDateString()}`);
+      console.log(`  - Valid until: ${new Date(info.sslData.details.validTo).toLocaleDateString()}`);
       console.log(
-        `  - Valid from: ${domainInfo.sslData.details.validFrom.toLocaleDateString()}`
-      );
-      console.log(
-        `  - Valid until: ${domainInfo.sslData.details.validTo.toLocaleDateString()}`
-      );
-      console.log(
-        `  - Days until expiration: ${Math.floor(
-          (domainInfo.sslData.details.validTo.getTime() - Date.now()) /
-            (1000 * 60 * 60 * 24)
-        )}`
+        `  - Days until expiration: ${Math.floor((new Date(info.sslData.details.validTo).getTime() - Date.now()) / (1000 * 60 * 60 * 24))}`
       );
     } else {
-      // Fallback to original display format
+      console.log(`  - Issued to: ${JSON.stringify(info.sslData?.subject)}`);
+      console.log(`  - Issued by: ${JSON.stringify(info.sslData?.issuer)}`);
       console.log(
-        `  - Issued to: ${JSON.stringify(domainInfo.sslData.subject)}`
+        `  - Valid: ${info.sslData?.valid ? chalk.green("✅ Yes") : chalk.red("❌ No")}`
       );
-      console.log(
-        `  - Issued by: ${JSON.stringify(domainInfo.sslData.issuer)}`
-      );
-      console.log(
-        `  - Valid: ${
-          domainInfo.sslData.valid ? chalk.green("✅ Yes") : chalk.red("❌ No")
-        }`
-      );
-      console.log(
-        `  - Valid from: ${new Date(
-          domainInfo.sslData.validFrom
-        ).toLocaleDateString()}`
-      );
-      console.log(
-        `  - Valid until: ${new Date(
-          domainInfo.sslData.validTo
-        ).toLocaleDateString()}`
-      );
+      if (info.sslData) {
+        console.log(`  - Valid from: ${new Date(info.sslData.validFrom).toLocaleDateString()}`);
+        console.log(`  - Valid until: ${new Date(info.sslData.validTo).toLocaleDateString()}`);
+      }
     }
-
-    // Show certificate availability
-    if (domainInfo.sslData.certificate) {
+    if (info.sslData?.certificate) {
       console.log(`  - ${chalk.green("✅")} PEM certificate available`);
     }
+  }
 
-    // Server Information
+  if (allow("server") || allow("http")) {
     console.log("\n" + chalk.cyan.bold("🖥️ Server:"));
-    console.log(
-      `  - Server software: ${
-        domainInfo.serverData || chalk.gray("Not available")
-      }`
-    );
-    console.log(
-      `  - HTTP Status: ${
-        domainInfo.httpStatus
-          ? domainInfo.httpStatus >= 200 && domainInfo.httpStatus < 300
-            ? chalk.green(domainInfo.httpStatus)
-            : chalk.yellow(domainInfo.httpStatus)
-          : chalk.gray("Not available")
-      }`
-    );
-
-    // DNS Information
-    if (domainInfo.dnsData) {
-      console.log("\n" + chalk.yellow.bold("🌐 DNS Records:"));
-      console.log(`  - A Records: ${domainInfo.dnsData.A.join(", ")}`);
+    if (allow("server")) {
       console.log(
-        `  - CNAME: ${domainInfo.dnsData.CNAME || chalk.gray("None")}`
+        `  - Server software: ${info.serverData || chalk.gray("Not available")}`
       );
+    }
+    if (allow("http")) {
+      console.log(
+        `  - HTTP Status: ${
+          info.httpStatus
+            ? info.httpStatus >= 200 && info.httpStatus < 300
+              ? chalk.green(info.httpStatus)
+              : chalk.yellow(info.httpStatus)
+            : chalk.gray("Not available")
+        }`
+      );
+    }
+  }
 
-      if (domainInfo.dnsData.MX.length) {
+  if (allow("dns")) {
+    if (info.dnsData) {
+      console.log("\n" + chalk.yellow.bold("🌐 DNS Records:"));
+      console.log(`  - A Records: ${info.dnsData.A.join(", ")}`);
+      console.log(`  - CNAME: ${info.dnsData.CNAME || chalk.gray("None")}`);
+      if (info.dnsData.MX.length) {
         console.log("  - MX Records:");
-        domainInfo.dnsData.MX.forEach((mx) => {
+        info.dnsData.MX.forEach((mx: any) => {
           console.log(`    * ${mx.exchange} (priority: ${mx.priority})`);
         });
       }
-
-      if (domainInfo.dnsData.TXT.length) {
+      if (info.dnsData.TXT.length) {
         console.log("  - TXT Records:");
-        domainInfo.dnsData.TXT.forEach((txt) => {
+        info.dnsData.TXT.forEach((txt: string) => {
           console.log(`    * ${txt}`);
         });
       }
-
-      if (domainInfo.dnsData.NS.length) {
+      if (info.dnsData.NS.length) {
         console.log("  - NS Records:");
-        domainInfo.dnsData.NS.forEach((ns) => {
+        info.dnsData.NS.forEach((ns: string) => {
           console.log(`    * ${ns}`);
         });
       }
     } else {
       console.log("\n" + chalk.red("🌐 DNS Records: Not available"));
     }
+  }
 
-    // WHOIS Information - New in v2.3.0
-    if (domainInfo.whoisData) {
+  if (allow("whois")) {
+    if (info.whoisData) {
       console.log("\n" + chalk.magenta.bold("📋 WHOIS Information:"));
-
-      // Registrar information
       console.log(
-        `  - Registrar: ${
-          domainInfo.whoisData.registrar || chalk.gray("Not available")
-        }`
+        `  - Registrar: ${info.whoisData.registrar || chalk.gray("Not available")}`
       );
-      if (domainInfo.whoisData.registrarUrl) {
-        console.log(`  - Registrar URL: ${domainInfo.whoisData.registrarUrl}`);
+      if (info.whoisData.registrarUrl) {
+        console.log(`  - Registrar URL: ${info.whoisData.registrarUrl}`);
       }
-      if (domainInfo.whoisData.registrarIanaId) {
-        console.log(
-          `  - Registrar IANA ID: ${domainInfo.whoisData.registrarIanaId}`
-        );
+      if (info.whoisData.registrarIanaId) {
+        console.log(`  - Registrar IANA ID: ${info.whoisData.registrarIanaId}`);
       }
-
-      // Domain dates
       const datesAvailable =
-        domainInfo.whoisData.creationDate ||
-        domainInfo.whoisData.updatedDate ||
-        domainInfo.whoisData.expirationDate;
-
+        info.whoisData.creationDate || info.whoisData.updatedDate || info.whoisData.expirationDate;
       if (datesAvailable) {
         console.log("\n  " + chalk.magenta.bold("⏰ Important Dates:"));
       }
-
-      if (domainInfo.whoisData.creationDate) {
-        console.log(
-          `  - Created: ${domainInfo.whoisData.creationDate.toLocaleDateString()}`
-        );
+      if (info.whoisData.creationDate) {
+        console.log(`  - Created: ${new Date(info.whoisData.creationDate).toLocaleDateString()}`);
       }
-
-      if (domainInfo.whoisData.updatedDate) {
-        console.log(
-          `  - Last Updated: ${domainInfo.whoisData.updatedDate.toLocaleDateString()}`
-        );
+      if (info.whoisData.updatedDate) {
+        console.log(`  - Last Updated: ${new Date(info.whoisData.updatedDate).toLocaleDateString()}`);
       }
-
-      if (domainInfo.whoisData.expirationDate) {
+      if (info.whoisData.expirationDate) {
         const now = new Date();
         const daysUntilExpiration = Math.floor(
-          (domainInfo.whoisData.expirationDate.getTime() - now.getTime()) /
-            (1000 * 60 * 60 * 24)
+          (new Date(info.whoisData.expirationDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
         );
-
         const expirationColor =
-          daysUntilExpiration < 30
-            ? chalk.red
-            : daysUntilExpiration < 90
-            ? chalk.yellow
-            : chalk.green;
-
+          daysUntilExpiration < 30 ? chalk.red : daysUntilExpiration < 90 ? chalk.yellow : chalk.green;
         console.log(
-          `  - Expires: ${domainInfo.whoisData.expirationDate.toLocaleDateString()} (${expirationColor(
+          `  - Expires: ${new Date(info.whoisData.expirationDate).toLocaleDateString()} (${expirationColor(
             `${daysUntilExpiration} days`
           )})`
         );
       }
-
-      // Registrant information (if available)
       if (
-        domainInfo.whoisData.registrant &&
-        (domainInfo.whoisData.registrant.organization ||
-          domainInfo.whoisData.registrant.country ||
-          domainInfo.whoisData.registrant.email)
-      ) {
-        console.log("\n  " + chalk.magenta.bold("👤 Registrant Information:"));
-
-        if (domainInfo.whoisData.registrant.organization) {
-          console.log(
-            `  - Organization: ${domainInfo.whoisData.registrant.organization}`
-          );
-        }
-
-        if (domainInfo.whoisData.registrant.country) {
-          console.log(
-            `  - Country: ${domainInfo.whoisData.registrant.country}`
-          );
-        }
-
-        if (domainInfo.whoisData.registrant.email) {
-          console.log(`  - Email: ${domainInfo.whoisData.registrant.email}`);
-        }
-      }
-
-      // Domain status
-      if (
-        domainInfo.whoisData.statusCodes &&
-        domainInfo.whoisData.statusCodes.length > 0
+        info.whoisData.statusCodes && info.whoisData.statusCodes.length > 0
       ) {
         console.log("\n  " + chalk.magenta.bold("🔒 Domain Status:"));
-        domainInfo.whoisData.statusCodes.forEach((status) => {
-          // Color code common status values
+        info.whoisData.statusCodes.forEach((status: string) => {
           let statusDisplay = status;
-
           if (
             status.includes("clientTransferProhibited") ||
             status.includes("serverTransferProhibited")
           ) {
-            statusDisplay =
-              chalk.yellow(status) + " " + chalk.dim("(Transfer locked)");
+            statusDisplay = chalk.yellow(status) + " " + chalk.dim("(Transfer locked)");
           } else if (
             status.includes("clientDeleteProhibited") ||
             status.includes("serverDeleteProhibited")
           ) {
-            statusDisplay =
-              chalk.yellow(status) + " " + chalk.dim("(Deletion protected)");
+            statusDisplay = chalk.yellow(status) + " " + chalk.dim("(Deletion protected)");
           } else if (
             status.includes("clientUpdateProhibited") ||
             status.includes("serverUpdateProhibited")
           ) {
-            statusDisplay =
-              chalk.yellow(status) + " " + chalk.dim("(Updates restricted)");
-          } else if (
-            status.includes("clientHold") ||
-            status.includes("serverHold")
-          ) {
-            statusDisplay =
-              chalk.red(status) + " " + chalk.dim("(Domain not in DNS)");
+            statusDisplay = chalk.yellow(status) + " " + chalk.dim("(Updates restricted)");
+          } else if (status.includes("clientHold") || status.includes("serverHold")) {
+            statusDisplay = chalk.red(status) + " " + chalk.dim("(Domain not in DNS)");
           } else if (status.includes("ok")) {
             statusDisplay = chalk.green(status);
           }
-
           console.log(`  - ${statusDisplay}`);
         });
       }
-
-      // Name servers from WHOIS
-      if (
-        domainInfo.whoisData.nameServers &&
-        domainInfo.whoisData.nameServers.length > 0
-      ) {
-        console.log(
-          "\n  " + chalk.magenta.bold("🌐 Name Servers (from WHOIS):")
-        );
-        domainInfo.whoisData.nameServers.forEach((ns) => {
+      if (info.whoisData.nameServers && info.whoisData.nameServers.length > 0) {
+        console.log("\n  " + chalk.magenta.bold("🌐 Name Servers (from WHOIS):"));
+        info.whoisData.nameServers.forEach((ns: string) => {
           console.log(`  - ${ns}`);
         });
       }
-
-      // Add a sample of the raw WHOIS text
-      if (domainInfo.whoisData.rawText) {
+      if (info.whoisData.rawText) {
         console.log("\n  " + chalk.magenta.bold("📝 Sample Raw WHOIS Data:"));
-        // Get first few lines of raw WHOIS text (limited to 5 lines)
-        const rawTextSample = domainInfo.whoisData.rawText
+        const rawTextSample = info.whoisData.rawText
           .split("\n")
-          .filter((line) => line.trim() !== "")
+          .filter((line: string) => line.trim() !== "")
           .slice(0, 5)
-          .map((line) => `  ${line}`)
+          .map((line: string) => `  ${line}`)
           .join("\n");
         console.log(chalk.gray(`${rawTextSample}`));
-        console.log(
-          chalk.dim("  (Showing first 5 non-empty lines of raw WHOIS data)")
-        );
-        console.log(
-          chalk.cyan(
-            "\n  💡 Tip: To view full WHOIS data, use: whois " + domain
-          )
-        );
+        console.log(chalk.dim("  (Showing first 5 non-empty lines of raw WHOIS data)"));
+        console.log(chalk.cyan("\n  💡 Tip: To view full WHOIS data, use: whois " + domain));
       }
     } else {
-      console.log(
-        "\n" +
-          chalk.magenta("📋 WHOIS Information: ") +
-          chalk.gray("Not available")
-      );
+      console.log("\n" + chalk.magenta("📋 WHOIS Information: ") + chalk.gray("Not available"));
     }
-  } catch (error) {
-    console.error(chalk.red("❌ Error fetching domain information:"));
-    if (error instanceof Error) {
-      console.error(chalk.red(`   ${error.message}`));
-
-      // Provide helpful suggestions based on error message
-      if (error.message.includes("Invalid domain name")) {
-        console.error(
-          chalk.yellow(
-            "\nSuggestion: The domain format is invalid. Try using a format like 'example.com' without protocol (http://, https://) or trailing paths."
-          )
-        );
-      } else if (error.message.includes("Could not fetch SSL data")) {
-        console.error(
-          chalk.yellow(
-            "\nSuggestion: SSL connection failed. This could be because:"
-          )
-        );
-        console.error(chalk.yellow("  - The domain doesn't support HTTPS"));
-        console.error(
-          chalk.yellow("  - The SSL certificate is invalid or self-signed")
-        );
-        console.error(
-          chalk.yellow("  - Try using a longer timeout with --timeout option")
-        );
-      } else if (error.message.includes("Could not fetch DNS data")) {
-        console.error(
-          chalk.yellow(
-            "\nSuggestion: DNS resolution failed. This could be because:"
-          )
-        );
-        console.error(chalk.yellow("  - The domain doesn't exist"));
-        console.error(
-          chalk.yellow("  - Your network or DNS resolver is having issues")
-        );
-        console.error(
-          chalk.yellow(
-            "  - Try checking your internet connection or using a different DNS resolver"
-          )
-        );
-      } else if (error.message.includes("Could not fetch server data")) {
-        console.error(
-          chalk.yellow(
-            "\nSuggestion: Server connection failed. This could be because:"
-          )
-        );
-        console.error(chalk.yellow("  - The server is down or not responding"));
-        console.error(
-          chalk.yellow("  - A firewall is blocking the connection")
-        );
-        console.error(
-          chalk.yellow("  - Try increasing the timeout with --timeout option")
-        );
-      } else if (error.message.includes("ENOTFOUND")) {
-        console.error(
-          chalk.yellow("\nSuggestion: Domain not found. This could be because:")
-        );
-        console.error(
-          chalk.yellow("  - The domain doesn't exist or is misspelled")
-        );
-        console.error(
-          chalk.yellow("  - Your DNS resolver can't resolve this domain")
-        );
-        console.error(chalk.yellow("  - Check for typos in the domain name"));
-      } else if (
-        error.message.includes("ETIMEDOUT") ||
-        error.message.includes("timeout")
-      ) {
-        console.error(
-          chalk.yellow(
-            "\nSuggestion: Connection timed out. This could be because:"
-          )
-        );
-        console.error(chalk.yellow("  - The server is slow to respond"));
-        console.error(chalk.yellow("  - Your internet connection is unstable"));
-        console.error(
-          chalk.yellow("  - Try increasing the timeout with --timeout option")
-        );
-      } else if (error.message.includes("ECONNREFUSED")) {
-        console.error(
-          chalk.yellow(
-            "\nSuggestion: Connection refused. This could be because:"
-          )
-        );
-        console.error(
-          chalk.yellow(
-            "  - The server is not accepting connections on port 443 (HTTPS)"
-          )
-        );
-        console.error(chalk.yellow("  - The domain might not support HTTPS"));
-      }
-    } else {
-      console.error(chalk.red(`   ${String(error)}`));
-    }
-    forceExit(1);
   }
 }
 
-// Helper function to ensure process terminates
-function forceExit(code: number = 0): void {
-  // Force exit after a short delay to allow console output to complete
-  setTimeout(() => {
-    process.exit(code);
-  }, 100);
+function renderSummaryTable(rows: Array<Record<string, unknown>>) {
+  const headers = [
+    "domain",
+    "http_status",
+    "server",
+    "ssl_valid",
+    "ssl_valid_to",
+    "a_count",
+    "mx_count",
+    "ns_count",
+    "whois_expiration",
+    "whois_days_to_expiry",
+  ];
+  const widths = headers.map((h) => Math.max(h.length, ...rows.map((r) => String(r[h] ?? "").length)));
+  const pad = (s: string, w: number) => (s + " ".repeat(w)).slice(0, w);
+  const line = headers.map((h, i) => pad(h, widths[i])).join("  ");
+  console.log(chalk.bold(line));
+  for (const r of rows) {
+    const l = headers.map((h, i) => pad(String(r[h] ?? ""), widths[i])).join("  ");
+    console.log(l);
+  }
 }
 
-main()
-  .catch((error) => {
-    console.error(chalk.red("Unexpected error:"), error);
-    forceExit(1);
-  })
-  .finally(() => {
-    // Ensure process terminates even on success
-    forceExit(0);
+async function main(): Promise<void> {
+  if (args.includes("--help") || args.length === 0) {
+    printHelpAndExit();
+  }
+
+  const jsonShortcut = args.includes("--json");
+  const formatArg = (getArgValue("--format") || (jsonShortcut ? "json" : "table")) as CliFormat;
+  const format: CliFormat = ["json", "csv", "table"].includes(formatArg)
+    ? (formatArg as CliFormat)
+    : "table";
+  const outFile = getArgValue("--out");
+  const timeoutStr = getArgValue("--timeout");
+  const fileInput = getArgValue("--file");
+  const concurrencyStr = getArgValue("--concurrency");
+  const include = parseListFlag("--include");
+  const exclude = parseListFlag("--exclude");
+
+  const options: RequestOptions = {};
+  if (timeoutStr) {
+    const t = parseInt(timeoutStr, 10);
+    if (!isNaN(t)) options.timeout = t;
+  }
+
+  let domains: string[] = [];
+  const positionalDomain = !fileInput ? args[0] : undefined;
+  if (fileInput) {
+    domains = await readDomainsFromFile(fileInput);
+  }
+  if (positionalDomain) {
+    domains.push(positionalDomain);
+  }
+  domains = sanitizeDomainList(domains);
+
+  if (domains.length === 0) {
+    console.error(chalk.red("No domains specified."));
+    printHelpAndExit();
+  }
+
+  if (domains.length === 1) {
+    const domain = domains[0];
+    try {
+      const info = await fetchDomainInfo(domain, options);
+      if (!info) {
+        console.error(chalk.red("No domain information returned"));
+        console.error(chalk.yellow("Suggestion: Verify that the domain exists and is accessible."));
+        return;
+      }
+      if (format === "json") {
+        const output = include || exclude ? pickSections(info as any, include, exclude) : info;
+        const text = JSON.stringify(output, null, 2);
+        if (outFile) {
+          await fs.promises.writeFile(outFile, text, "utf8");
+        } else {
+          console.log(text);
+        }
+        return;
+      }
+      if (format === "csv") {
+        const row = summarizeRow(domain, info);
+        const headers = Object.keys(row);
+        const csv = buildCsv([row], headers);
+        if (outFile) {
+          await fs.promises.writeFile(outFile, csv, "utf8");
+        } else {
+          console.log(csv);
+        }
+        return;
+      }
+      // table
+      renderSingle(domain, info, include, exclude);
+      return;
+    } catch (error) {
+      console.error(chalk.red("❌ Error fetching domain information:"));
+      if (error instanceof Error) {
+        console.error(chalk.red(`   ${error.message}`));
+      } else {
+        console.error(chalk.red(`   ${String(error)}`));
+      }
+      process.exit(1);
+    }
+  }
+
+  // Batch mode
+  const concurrency = Math.max(1, Math.min(50, parseInt(concurrencyStr || "5", 10) || 5));
+  console.log(chalk.blue(`Processing ${domains.length} domains with concurrency ${concurrency}...`));
+  const results = await processWithConcurrency(domains, options, concurrency, (done, total, item) => {
+    const prefix = item.error ? chalk.red("✖") : chalk.green("✔");
+    console.log(`${prefix} ${item.domain} (${done}/${total})`);
   });
+
+  const successes = results.filter((r) => r.info);
+  const failures = results.filter((r) => r.error);
+
+  if (format === "json") {
+    const payload = successes.map((r) => ({
+      domain: r.domain,
+      data: include || exclude ? pickSections(r.info as any, include, exclude) : r.info,
+    }));
+    const text = JSON.stringify({ results: payload, failed: failures }, null, 2);
+    if (outFile) {
+      await fs.promises.writeFile(outFile, text, "utf8");
+    } else {
+      console.log(text);
+    }
+  } else if (format === "csv") {
+    const rows = successes.map((r) => summarizeRow(r.domain, r.info));
+    const headers = rows.length > 0 ? Object.keys(rows[0]) : [
+      "domain",
+      "http_status",
+      "server",
+      "ssl_valid",
+      "ssl_valid_to",
+      "a_count",
+      "cname",
+      "mx_count",
+      "ns_count",
+      "txt_count",
+      "whois_registrar",
+      "whois_creation",
+      "whois_expiration",
+      "whois_days_to_expiry",
+    ];
+    const csv = buildCsv(rows, headers);
+    if (outFile) {
+      await fs.promises.writeFile(outFile, csv, "utf8");
+    } else {
+      console.log(csv);
+    }
+  } else {
+    // table summary
+    const rows = successes.map((r) => summarizeRow(r.domain, r.info));
+    if (rows.length > 0) {
+      console.log("");
+      renderSummaryTable(rows);
+    }
+  }
+
+  // Diagnostics summary
+  console.log("");
+  console.log(chalk.bold("Summary:"));
+  console.log(chalk.green(`  ✔ Succeeded: ${successes.length}`));
+  console.log(chalk.red(`  ✖ Failed:    ${failures.length}`));
+  if (failures.length > 0) {
+    const buckets: Record<string, number> = {};
+    for (const f of failures) {
+      const msg = (f.error || "Unknown error").split(".")[0];
+      buckets[msg] = (buckets[msg] || 0) + 1;
+    }
+    console.log("  Error categories:");
+    Object.entries(buckets)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([k, v]) => console.log(`    - ${k}: ${v}`));
+  }
+}
+
+main().catch((error) => {
+  console.error(chalk.red("Unexpected error:"), error);
+  process.exit(1);
+});

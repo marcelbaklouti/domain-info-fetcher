@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2025-09-06
+
+### Added
+
+- CLI batch processing: `--file <path>` to read domains, `--concurrency <n>` for parallelism
+- Export formats: `--format json|csv|table` and `--out <file>` for writing results
+- Include/Exclude filters: `--include ssl,server,dns,http,whois` and `--exclude ...`
+- Enhanced diagnostics: per-domain progress indicators and aggregated error summary
+
+### Changed
+
+- Refactored CLI to support single and batch modes with consistent output
+- Improved table rendering and JSON structure for batch runs
+
+### Internal
+
+- Extracted domain utilities to `src/utils.ts`; removed circular imports
+- Type-only `WhoisData` import/exports to avoid runtime cycles
+
 ## [2.3.0] - 2025-03-03
 
 ### Added

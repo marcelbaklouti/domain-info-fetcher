@@ -155,13 +155,19 @@ The CLI provides a comprehensive, color-coded output with sections for:
   - 🌐 Name servers
   - Sample of the raw WHOIS data with tip for viewing full data
 
-### CLI Options
+### CLI Options (v3.0)
 
-| Option           | Description                                          |
-| ---------------- | ---------------------------------------------------- |
-| `--timeout <ms>` | Set request timeout in milliseconds (default: 10000) |
-| `--json`         | Output results as JSON                               |
-| `--help`         | Show help information                                |
+| Option              | Description                                                 |
+| ------------------- | ----------------------------------------------------------- |
+| `--timeout <ms>`    | Set request timeout in milliseconds (default: 10000)        |
+| `--format <fmt>`    | Output format: `json`, `csv`, or `table` (default: `table`) |
+| `--out <file>`      | Write output to file (JSON/CSV/table text)                  |
+| `--file <path>`     | Read domains from file (one per line)                       |
+| `--concurrency <n>` | Concurrent lookups with `--file` (default: 5)               |
+| `--include <parts>` | Only include sections: `ssl,server,dns,http,whois`          |
+| `--exclude <parts>` | Exclude sections (takes precedence over include)            |
+| `--json`            | Shortcut for `--format json`                                |
+| `--help`            | Show help information                                       |
 
 ## API Documentation
 
@@ -341,36 +347,21 @@ const options = {
 const info = await fetchDomainInfo("example.com", options);
 ```
 
-### Processing Multiple Domains
+### Batch Processing (v3.0)
 
-Check multiple domains in parallel:
+Process multiple domains from a file with concurrency limits and export:
 
-```typescript
-import { fetchDomainInfo } from "domain-info-fetcher";
+```bash
+domain-info-fetcher --file domains.txt --concurrency 10 --format csv --out results.csv
+```
 
-async function checkMultipleDomains(domains: string[]) {
-  const results = await Promise.allSettled(
-    domains.map((domain) => fetchDomainInfo(domain))
-  );
+Sample `domains.txt`:
 
-  // Process results
-  results.forEach((result, index) => {
-    const domain = domains[index];
-    if (result.status === "fulfilled") {
-      const info = result.value;
-      console.log(
-        `✅ ${domain}: SSL valid until ${new Date(
-          info.sslData.validTo
-        ).toLocaleDateString()}`
-      );
-    } else {
-      console.log(`❌ ${domain}: Error - ${result.reason.message}`);
-    }
-  });
-}
-
-// Example usage
-checkMultipleDomains(["example.com", "github.com", "blog.medium.com"]);
+```text
+# Comments allowed, blank lines ignored
+example.com
+github.com
+blog.example.com
 ```
 
 ### Working with WHOIS Data

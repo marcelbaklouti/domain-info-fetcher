@@ -1,6 +1,6 @@
 {
   "name": "domain-info-fetcher",
-  "version": "2.3.1",
+  "version": "3.0.0",
   "description": "A powerful TypeScript/JavaScript tool for comprehensive domain analysis, featuring detailed WHOIS data with registration dates, registrars, and domain status. Offers SSL certificate extraction (with PEM support), DNS records, and server details. Includes a feature-rich CLI with colorized output, full TypeScript support, and flexible data export options. Perfect for domain monitoring, security analysis, and compliance checks.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
